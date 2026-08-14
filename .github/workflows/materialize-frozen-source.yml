@@ -1,0 +1,70 @@
+name: Materialize frozen Mizan source
+
+on:
+  push:
+    branches: [release/aab-3.1.0]
+    paths:
+      - '.github/workflows/materialize-frozen-source.yml'
+      - 'RELEASE_SOURCE.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_REPO: https://github.com/msdgabr-sudo/Mizan.git
+  SOURCE_SHA: 6e49775df5742413371a4165ea985173c43f5f5e
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: release/aab-3.1.0
+          fetch-depth: 1
+
+      - name: Fetch exact approved source commit
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/mizan-source source
+          mkdir -p /tmp/mizan-source source
+          git -C /tmp/mizan-source init
+          git -C /tmp/mizan-source remote add origin "$SOURCE_REPO"
+          git -C /tmp/mizan-source fetch --depth=1 origin "$SOURCE_SHA"
+          ACTUAL=$(git -C /tmp/mizan-source rev-parse FETCH_HEAD)
+          test "$ACTUAL" = "$SOURCE_SHA"
+          git -C /tmp/mizan-source archive "$ACTUAL" | tar -x -C source
+          printf '%s\n' "$ACTUAL" > source/.release-source-sha
+
+      - name: Reject secrets and generated signing material
+        run: |
+          set -euo pipefail
+          if find source -type f \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*service-account*.json' \) -print -quit | grep -q .; then
+            echo 'ERROR: signing secret or service-account material exists in frozen source.' >&2
+            exit 1
+          fi
+          test ! -e source/android-twa/keystore/qiblaastro-upload.jks
+
+      - name: Verify frozen release identity before commit
+        run: |
+          set -euo pipefail
+          cd source
+          python3 tools/pre_apk_check.py
+          python3 android-twa/check_twa_config.py
+          node tests/timezone-production-wiring.test.js
+          node tests/native-android-localization-security.test.js
+          node tests/pre-native-release-readiness.test.js
+
+      - name: Commit immutable source snapshot into release repository
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A source
+          if git diff --cached --quiet; then
+            echo 'Frozen source already materialized; nothing to commit.'
+            exit 0
+          fi
+          git commit -m "release: materialize Mizan ${SOURCE_SHA}"
+          git push origin HEAD:release/aab-3.1.0
