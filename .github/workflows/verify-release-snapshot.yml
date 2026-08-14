@@ -5,6 +5,7 @@ on:
     branches: [release/aab-3.1.0]
     paths:
       - 'source/**'
+      - '.github/workflows/verify-release-snapshot.yml'
   workflow_dispatch:
 
 permissions:
