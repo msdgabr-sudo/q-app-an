@@ -29,7 +29,7 @@ function isAppSurface(){
 }
 function readState(){try{return JSON.parse(root.localStorage.getItem(STORAGE_KEY)||'null');}catch(_){return null;}}
 function writeState(value){try{root.localStorage.setItem(STORAGE_KEY,JSON.stringify(value));}catch(_){ }}
-function permissionLabel(value){return value==='granted'?'مسموح':value==='denied'?'مرفوض':value==='unsupported'?'عند الحاجة':'بانتظار الموافقة';}
+function permissionLabel(value){return value==='granted'?'مسموح':value==='denied'?'مرفوض':value==='unsupported'?'عند الحاجة':value==='unavailable'?'الموقع غير متاح':'بانتظار الموافقة';}
 function permissionClass(value){return value==='granted'||value==='unsupported'?'ok':value==='denied'?'bad':'wait';}
 
 function ensureStyle(){
@@ -42,13 +42,43 @@ function toast(text){
   ensureStyle();var old=root.document.getElementById('qa-permission-toast');if(old)old.remove();
   var n=root.document.createElement('div');n.id='qa-permission-toast';n.className='qa-permission-toast';n.textContent=text;root.document.body.appendChild(n);root.setTimeout(function(){if(n&&n.parentNode)n.remove();},4200);
 }
-function requestLocation(){
+async function queryLocationPermission(){
+  try{
+    if(!root.navigator.permissions||typeof root.navigator.permissions.query!=='function')return 'unknown';
+    var status=await root.navigator.permissions.query({name:'geolocation'});
+    return status&&status.state?status.state:'unknown';
+  }catch(_){return 'unknown';}
+}
+async function requestLocation(){
+  if(!root.navigator.geolocation)return 'unsupported';
+  var existing=await queryLocationPermission();
+  if(existing==='granted'||existing==='denied')return existing;
   return new Promise(function(resolve){
-    if(!root.navigator.geolocation){resolve('unsupported');return;}
     var done=false;function finish(v){if(done)return;done=true;resolve(v);}
-    try{root.navigator.geolocation.getCurrentPosition(function(){finish('granted');},function(err){finish(err&&err.code===1?'denied':'unavailable');},{enableHighAccuracy:true,timeout:12000,maximumAge:0});}
-    catch(_){finish('unavailable');}
+    try{
+      root.navigator.geolocation.getCurrentPosition(
+        function(){finish('granted');},
+        function(err){
+          /* PERMISSION_DENIED is the only geolocation error that means the user
+             did not grant location. POSITION_UNAVAILABLE and TIMEOUT mean the
+             permission request was allowed but a position fix was not available
+             yet; they must not trap first-run onboarding in a permission loop. */
+          if(err&&err.code===1){finish('denied');return;}
+          finish('granted');
+        },
+        {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+      );
+    }catch(_){finish('unavailable');}
   });
+}
+function currentWebNotificationState(){
+  try{
+    if(!('Notification' in root))return 'unsupported';
+    if(root.Notification.permission==='granted'||root.Notification.permission==='denied')return root.Notification.permission;
+  }catch(_){ }
+  /* Notifications are contextual in the Android app. Do not compete with the
+     location prompt during first-run onboarding. */
+  return 'unsupported';
 }
 function requestWebNotifications(){
   try{
@@ -62,23 +92,25 @@ function setState(name,value){var n=stateNode(name);if(!n)return;n.textContent=p
 function closeOverlay(markDone){var n=root.document.getElementById('qa-permission-overlay');if(n)n.remove();if(markDone)writeState({completed:true,completedAt:Date.now()});}
 
 async function runPermissionRequest(){
-  var btn=root.document.getElementById('qa-permission-allow');if(btn){btn.disabled=true;btn.textContent='جاري طلب الصلاحيات...';}
-  /* Keep permission requests tied to the user's click. Native Android notification
-     permission is intentionally requested later by AzkarReminderActivity when the
-     user explicitly turns on a native reminder. */
-  var notificationPromise=requestWebNotifications();
-  var locationPromise=requestLocation();
-  var notificationResult=await notificationPromise;setState('notifications',notificationResult);
-  var locationResult=await locationPromise;setState('location',locationResult);
+  var btn=root.document.getElementById('qa-permission-allow');if(btn){btn.disabled=true;btn.textContent='جاري طلب صلاحية الموقع...';}
+  /* Location is the only first-run permission request. Android notification
+     permission remains contextual and is requested by the native reminder flow. */
+  var notificationResult=currentWebNotificationState();setState('notifications',notificationResult);
+  var locationResult=await requestLocation();setState('location',locationResult);
   var acceptedLocation=locationResult==='granted'||locationResult==='unsupported';
-  var acceptedNotifications=notificationResult==='granted'||notificationResult==='unsupported'||notificationResult==='default';
-  if(acceptedLocation&&acceptedNotifications){
+  if(acceptedLocation){
     writeState({completed:true,location:locationResult,notifications:notificationResult,twa:isTwaSurface(),completedAt:Date.now()});
-    root.setTimeout(function(){closeOverlay(false);toast('تم إعداد الصلاحيات الأساسية. إذن Android للإشعارات سيُطلب فقط عند تشغيل تنبيه يحتاجه، والكاميرا عند التحقق الفلكي.');},350);
+    /* Permission success and GNSS fix are separate states. Once permission is
+       settled, ask the existing trusted GNSS path for a fresh device position. */
+    if(locationResult==='granted'&&typeof root.tryBrowserGPS==='function'){
+      root.setTimeout(function(){try{root.tryBrowserGPS();}catch(_){ }},0);
+    }
+    root.setTimeout(function(){closeOverlay(false);toast('تم اعتماد صلاحية الموقع. سيُحدَّث GPS/GNSS من الجهاز، والإشعارات تُطلب فقط عند تشغيل تنبيه يحتاجها.');},350);
     return;
   }
-  if(btn){btn.disabled=false;btn.textContent='إعادة طلب الصلاحيات';}
-  var note=root.document.getElementById('qa-permission-note');if(note)note.textContent='إذا سبق رفض الصلاحية، يمكنك تفعيلها لاحقًا من إعدادات Android أو إعدادات الموقع.';
+  if(btn){btn.disabled=false;btn.textContent='إعادة طلب صلاحية الموقع';}
+  var note=root.document.getElementById('qa-permission-note');
+  if(note)note.textContent=locationResult==='denied'?'صلاحية الموقع مرفوضة. فعّلها من إعدادات Android أو إعدادات الموقع ثم أعد المحاولة.':'تعذر بدء طلب الموقع. تحقق من إعدادات الموقع ثم أعد المحاولة.';
 }
 function mountOnboarding(force){
   if(!root.document||mounted&&!force)return;if(!force&&!isAppSurface())return;
@@ -88,6 +120,7 @@ function mountOnboarding(force){
   var wrap=root.document.createElement('div');wrap.id='qa-permission-overlay';wrap.className='qa-permission-overlay';
   wrap.innerHTML='<div class="qa-permission-card" role="dialog" aria-modal="true" aria-labelledby="qa-permission-title"><h2 id="qa-permission-title">صلاحيات QiblaAstro</h2><p>نطلب فقط الصلاحيات اللازمة للميزات التي تستخدمها. لا تُستخدم هذه الصلاحيات للإعلانات.</p><div class="qa-permission-item"><span class="ico">📍</span><div><b>الموقع</b><small>لحساب القبلة ومواقيت الصلاة والبيانات الفلكية من موقع الجهاز.</small></div><span class="qa-permission-state wait" data-qa-permission-state="location">بانتظار الموافقة</span></div><div class="qa-permission-item"><span class="ico">🔔</span><div><b>الإشعارات</b><small>يُطلب إذن Android الأصلي عند تشغيل ميزة تنبيه تحتاجه، مثل تنبيه الأذكار.</small></div><span class="qa-permission-state wait" data-qa-permission-state="notifications">بانتظار الموافقة</span></div><div class="qa-permission-item"><span class="ico">📷</span><div><b>الكاميرا</b><small>لن نطلبها الآن. ستظهر نافذة الإذن فقط عندما تضغط «تحقق فلكي».</small></div><span class="qa-permission-state ok">عند الحاجة فقط</span></div><div class="qa-permission-actions"><button type="button" id="qa-permission-allow" class="qa-permission-primary">السماح والمتابعة</button><button type="button" id="qa-permission-later" class="qa-permission-secondary">لاحقًا</button></div><small id="qa-permission-note" class="qa-permission-note">يمكنك تغيير الصلاحيات لاحقًا من إعدادات Android أو إعدادات الموقع.</small></div>';
   root.document.body.appendChild(wrap);
+  setState('notifications',currentWebNotificationState());
   root.document.getElementById('qa-permission-allow').addEventListener('click',runPermissionRequest);
   root.document.getElementById('qa-permission-later').addEventListener('click',function(){closeOverlay(false);});
 }
