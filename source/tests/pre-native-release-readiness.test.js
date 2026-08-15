@@ -7,6 +7,8 @@ function exists(p){assert(fs.existsSync(p),`required file missing: ${p}`);}
   'js/geomag/wmm2025.js',
   'js/geomag/wmm2025-runtime.js',
   'js/presentation/permissions-onboarding.js',
+  'js/presentation/quran/host.js',
+  'js/presentation/quran/back-history.js',
   'tests/wmm2025-official-gate.js',
   'tests/wmm2025-global-coverage.test.js',
   'tests/wmm2025-runtime-integration.test.js',
@@ -35,34 +37,41 @@ assert(/var\s+notificationResult=currentWebNotificationState\(\)/.test(permissio
 assert(!/var\s+notificationPromise=requestWebNotifications\(\)/.test(permissions),'legacy concurrent notification/location permission request must remain removed');
 assert(/typeof\s+root\.tryBrowserGPS===['\"]function['\"]/.test(permissions),'successful permission onboarding must hand off to the existing trusted GNSS path');
 
-// Production Android/TWA Back contract: index.html contains the historical inline
-// navigation wrapper, therefore the authoritative runtime hotfix must live in a
-// guaranteed script that executes after parsing. Test the actual integration points,
-// including the Quran reader child level, not the unused split navigation file.
+// Production Android/TWA top-level Back contract. The parent document owns only
+// app-level navigation: internal screen -> Home -> Android/browser.
 const indexHtml=fs.readFileSync('index.html','utf8');
 const homeFinal=fs.readFileSync('js/home-final.js','utf8');
 assert(indexHtml.includes("var _pageHistory = ['home'];"),'expected historical inline Back wrapper not found; review navigation architecture before changing this gate');
 assert(indexHtml.includes('var _origGT = GT;'),'expected production inline GT wrapper not found; review navigation architecture before changing this gate');
-assert(/async\s+function\s+qrOpen\s*\(/.test(indexHtml),'production Quran reader opener must remain available for the navigation adapter');
-assert(/function\s+qrBack\s*\(\)/.test(indexHtml),'production Quran reader closer must remain available for the navigation adapter');
 assert(/Android\/TWA Back compatibility layer/.test(homeFinal),'production runtime Back compatibility layer must be present in home-final.js');
 assert(/var\s+renderPage=\(typeof\s+window\._origGT===['\"]function['\"]\)\?window\._origGT:window\.GT/.test(homeFinal),'runtime layer must bypass the legacy GT history wrapper and retain only its renderer');
-assert(/var\s+originalQrOpen=\(typeof\s+window\.qrOpen===['\"]function['\"]\)\?window\.qrOpen:null/.test(homeFinal),'runtime must capture the existing Quran opener without changing Quran rendering logic');
-assert(/var\s+originalQrBack=\(typeof\s+window\.qrBack===['\"]function['\"]\)\?window\.qrBack:null/.test(homeFinal),'runtime must capture the existing Quran closer without changing Quran rendering logic');
 assert(/history\.replaceState\(stateFor\('home'\)/.test(homeFinal),'startup must replace the current entry with Home rather than push a duplicate entry');
 assert(/if\(current===['\"]home['\"]\)history\.pushState\(stateFor\(id\)/.test(homeFinal),'opening a top-level internal screen from Home must create exactly one browser history entry');
 assert(/else\s+history\.replaceState\(stateFor\(id\)/.test(homeFinal),'internal-to-internal navigation must replace the single internal entry');
-assert(/function\s+isQuranReaderState\s*\(/.test(homeFinal),'runtime must explicitly recognize the Quran reader child history state');
-assert(/history\.pushState\(stateFor\('quran',\{type:['\"]reader['\"],surah:surah\}\)/.test(homeFinal),'opening a Surah from Quran index must push one child history entry');
-assert(/history\.replaceState\(stateFor\('quran',\{type:['\"]reader['\"],surah:surah\}\)/.test(homeFinal),'next/previous Surah navigation must replace the reader child entry instead of growing history');
-assert(/window\.qrBack=function\(\)[\s\S]*isQuranReaderState\(history\.state\)[\s\S]*history\.back\(\)/.test(homeFinal),'Quran reader Back control must consume its child history entry before closing the Quran section');
-assert(/function\s+renderHistoryState\s*\(state\)[\s\S]*originalQrOpen\(surah\)[\s\S]*closeQuranReader\(\)/.test(homeFinal),'popstate rendering must restore a reader state on Forward and close it when Back selects the Quran index state');
-assert(/window\.addEventListener\(['\"]popstate['\"],function\(event\)[\s\S]*stopImmediatePropagation\(\)[\s\S]*renderHistoryState\(event\.state\)/.test(homeFinal),'capture-phase popstate handler must neutralize the obsolete inline listener and render the full browser-selected app state');
-assert(/\},true\);/.test(homeFinal),'production popstate handler must be registered in capture phase');
-assert(/__qiblaBackNavigation=\{version:VERSION,owner:['\"]home-final['\"],stateKey:KEY,quranReader:true\}/.test(homeFinal),'runtime must expose a diagnostic marker confirming nested Quran Back support');
+assert(/window\.addEventListener\(['\"]popstate['\"],function\(event\)[\s\S]*stopImmediatePropagation\(\)/.test(homeFinal),'parent capture-phase popstate handler must neutralize the obsolete inline parent listener');
+
+// The visible Quran screen is NOT the legacy inline qr-reader. It is the modern
+// same-origin iframe pages/quran.html mounted by presentation/quran/host.js.
+const quranHost=fs.readFileSync('js/presentation/quran/host.js','utf8');
+const quranPage=fs.readFileSync('pages/quran.html','utf8');
+const quranBack=fs.readFileSync('js/presentation/quran/back-history.js','utf8');
+assert(/FRAME_SRC=['\"]pages\/quran\.html['\"]/.test(quranHost),'modern Quran iframe source must remain pages/quran.html');
+assert(/frame\.id=['\"]qa-quran-frame['\"]/.test(quranHost),'modern Quran must remain mounted in qa-quran-frame');
+assert(quranPage.includes('id="qrHome"')&&quranPage.includes('id="qrReader"')&&quranPage.includes('id="qrReaderBack"'),'modern Quran iframe contract must expose Home, Reader and Reader Back controls');
+assert(/function\s+wireBackHistory\s*\(frame\)/.test(quranHost),'Quran host must install the iframe-local Back bridge');
+assert(/presentation\/quran\/back-history\.js/.test(quranHost),'Quran host must load the dedicated iframe-local Back bridge');
+assert(/var\s+KEY=['\"]qiblaastroQuranNav['\"]/.test(quranBack),'Quran nested history must use an isolated iframe-local state key');
+assert(/new\s+MutationObserver/.test(quranBack),'Quran bridge must observe the real modern reader visibility rather than the obsolete parent reader');
+assert(/history\.pushState\(stateFor\(true\)/.test(quranBack),'opening the modern Quran reader must add exactly one iframe child history entry');
+assert(/observer\.observe\(reader,\{attributes:true,attributeFilter:\[['\"]class['\"]\]\}\)/.test(quranBack),'Quran bridge must observe only the reader class transition');
+assert(/back\.addEventListener\(['\"]click['\"],[\s\S]*history\.back\(\)[\s\S]*\},true\)/.test(quranBack),'visible Quran reader Back control must consume the same iframe history entry in capture phase');
+assert(/root\.addEventListener\(['\"]popstate['\"],[\s\S]*showIndexViaExistingControl\(\)/.test(quranBack),'Android/browser Back inside the iframe must return the modern reader to the Quran index');
+assert(/back\.click\(\)/.test(quranBack),'nested Back must reuse the Quran screen existing Back control instead of duplicating reader logic');
 
 const serviceWorker=fs.readFileSync('service-worker.js','utf8');
-assert(serviceWorker.includes("'./js/home-final.js'"),'service worker must critical-cache the guaranteed production runtime entry point');
+assert(serviceWorker.includes("'./js/home-final.js'"),'service worker must critical-cache the guaranteed parent runtime entry point');
+assert(serviceWorker.includes("'./js/presentation/quran/host.js'"),'service worker must critical-cache the modern Quran host');
+assert(serviceWorker.includes("'./js/presentation/quran/back-history.js'"),'service worker must critical-cache the Quran nested Back bridge');
 assert(/fetch\(r,\{cache:['\"]no-store['\"]\}\)/.test(serviceWorker),'service worker must network-refresh JS/CSS/HTML instead of pinning stale navigation code');
 
 const core=fs.readFileSync('js/04-core.js','utf8');
@@ -75,8 +84,8 @@ for(const p of treeCandidates)assert(!fs.existsSync(p),`unexpected native projec
 
 console.log('A2 pre-native Web/PWA release-readiness structure: PASS');
 console.log('Location onboarding: permission grant is separated from GNSS fix readiness; notification prompting remains contextual.');
-console.log('Navigation: Android/TWA Back hierarchy is Home -> Quran index -> Quran reader, with reader Back returning to Quran before Home.');
-console.log('Service Worker: home-final.js is critical-cached and JS/CSS/HTML use network-first no-store refresh.');
+console.log('Navigation: parent owns app-level Back; modern Quran iframe owns Reader -> Quran index nested Back.');
+console.log('Service Worker: parent and Quran nested Back presentation bridges are critical-cached with network-first code refresh.');
 console.log('Timezone status: legacy UTC+3 engine contract is isolated behind verified production civil-time conversion.');
 console.log('Native-source checkpoint remains separately governed by the guarded Bubblewrap/native-injection release path.');
 console.log('This is a pre-native source gate; APK/AAB artifacts still require their dedicated build/signing verification.');
