@@ -35,7 +35,7 @@ function Test-Jdk17Home([string]$JdkHome) {
         $ErrorActionPreference = $SavedPreference
     }
     if ($ExitCode -ne 0) { return $false }
-    return ($VersionText -match '(?m)^(?:openjdk|java) version "17(?:\.|\")')
+    return ($VersionText -match 'version\s+"17(?:\.|\")')
 }
 
 function Resolve-Jdk17Home {
