@@ -21,9 +21,9 @@ function Require-Command([string]$Name) {
     }
 }
 
-function Test-Jdk17Home([string]$Home) {
-    if (-not $Home) { return $false }
-    $JavaExe = Join-Path $Home 'bin\java.exe'
+function Test-Jdk17Home([string]$JdkHome) {
+    if (-not $JdkHome) { return $false }
+    $JavaExe = Join-Path $JdkHome 'bin\java.exe'
     if (-not (Test-Path -LiteralPath $JavaExe -PathType Leaf)) { return $false }
     $SavedPreference = $ErrorActionPreference
     try {
