@@ -27,7 +27,19 @@
       },true);
     }catch(_){ }
   }
-  function mount(force){if(mounted&&!force)return true;if(loading&&!force)return false;var host=root.document&&root.document.getElementById('page-quran');if(!host)return false;clearWatchdog();loading=true;mounted=false;resetHost(host);setState(host,'loading');host.setAttribute('data-presentation-source','pages/quran.html');var frame=root.document.createElement('iframe');frame.id='qa-quran-frame';frame.title='القرآن الكريم — QiblaAstro';frame.src=FRAME_SRC;frame.loading='eager';frame.style.cssText='display:block;width:100%;height:100dvh;min-height:100dvh;border:0;background:#071508;';frame.addEventListener('load',function(){clearWatchdog();if(!frameContractOk(frame)){showFailure(host,'وصل رد غير صالح بدل شاشة القرآن الحديثة.');return;}wireHome(frame);loading=false;mounted=true;setState(host,'ready');root.dispatchEvent(new CustomEvent('qiblaastro:presentation-page-mounted',{detail:{name:'quran',rootId:'page-quran',source:'pages/quran.html'}}));},{once:true});frame.addEventListener('error',function(){showFailure(host,'فشل تحميل ملف الشاشة الحديثة.');},{once:true});host.appendChild(frame);watchdog=root.setTimeout(function(){if(loading)showFailure(host,'استغرق التحميل وقتًا أطول من المتوقع.');},15000);return true;}
+  function wireBackHistory(frame){
+    try{
+      var d=frame&&frame.contentDocument;
+      if(!d||d.querySelector('script[data-qa-quran-back-history]'))return;
+      var s=d.createElement('script');
+      s.src='../js/presentation/quran/back-history.js?v=20260816-back1';
+      s.defer=true;
+      s.dataset.qaQuranBackHistory='1';
+      s.onerror=function(){try{console.error('[quran] nested Back history bridge failed to load');}catch(_){ }};
+      (d.head||d.documentElement).appendChild(s);
+    }catch(_){ }
+  }
+  function mount(force){if(mounted&&!force)return true;if(loading&&!force)return false;var host=root.document&&root.document.getElementById('page-quran');if(!host)return false;clearWatchdog();loading=true;mounted=false;resetHost(host);setState(host,'loading');host.setAttribute('data-presentation-source','pages/quran.html');var frame=root.document.createElement('iframe');frame.id='qa-quran-frame';frame.title='القرآن الكريم — QiblaAstro';frame.src=FRAME_SRC;frame.loading='eager';frame.style.cssText='display:block;width:100%;height:100dvh;min-height:100dvh;border:0;background:#071508;';frame.addEventListener('load',function(){clearWatchdog();if(!frameContractOk(frame)){showFailure(host,'وصل رد غير صالح بدل شاشة القرآن الحديثة.');return;}wireHome(frame);wireBackHistory(frame);loading=false;mounted=true;setState(host,'ready');root.dispatchEvent(new CustomEvent('qiblaastro:presentation-page-mounted',{detail:{name:'quran',rootId:'page-quran',source:'pages/quran.html'}}));},{once:true});frame.addEventListener('error',function(){showFailure(host,'فشل تحميل ملف الشاشة الحديثة.');},{once:true});host.appendChild(frame);watchdog=root.setTimeout(function(){if(loading)showFailure(host,'استغرق التحميل وقتًا أطول من المتوقع.');},15000);return true;}
   root.QiblaQuranHost=Object.freeze({mount:mount});
   if(root.document){if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',function(){mount(false);},{once:true});else mount(false);}
 })(typeof globalThis!=='undefined'?globalThis:window);
