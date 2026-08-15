@@ -112,6 +112,76 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
 })();
 
+/* Android/TWA Back compatibility layer.
+   The production index.html still contains a legacy inline GT wrapper and popstate
+   listener. home-final.js is a guaranteed deferred entry point, so it runs after
+   those inline declarations. This layer becomes the single runtime owner of top-
+   level history without touching any calculation, sensor or verification engine. */
+(function(){
+  'use strict';
+  var KEY='qiblaastroNav';
+  var VERSION=2;
+  var renderPage=(typeof window._origGT==='function')?window._origGT:window.GT;
+  if(typeof renderPage!=='function')return;
+
+  function valid(id){return !!(id&&document.getElementById('page-'+id));}
+  function stateFor(page){var s={};s[KEY]={version:VERSION,page:page};return s;}
+  function statePage(state){
+    var nav=state&&state[KEY];
+    return nav&&nav.version===VERSION&&valid(nav.page)?nav.page:null;
+  }
+  function domPage(){
+    try{
+      var active=document.querySelector('.page.active');
+      if(active&&active.id&&active.id.indexOf('page-')===0){
+        var id=active.id.slice(5);if(valid(id))return id;
+      }
+    }catch(_){ }
+    return 'home';
+  }
+  function render(id){try{renderPage(id);}catch(err){try{console.error('[nav] render failed',err);}catch(_){}}}
+
+  // Replace the legacy initial/null state in place. No extra history entry is
+  // created on startup, so Back from Home remains Android/browser-owned.
+  try{history.replaceState(stateFor('home'),'');}catch(_){ }
+
+  window.GT=function(id){
+    if(!id)id='home';
+    if(!valid(id)){try{console.error('Missing page:','page-'+id);}catch(_){ }return;}
+    var current=statePage(history.state)||'home';
+    var visible=domPage();
+
+    if(id==='home'){
+      if(visible!=='home'&&current!=='home'){
+        try{history.back();return;}catch(_){ }
+      }
+      try{history.replaceState(stateFor('home'),'');}catch(_){ }
+      render('home');
+      return;
+    }
+
+    try{
+      if(current==='home')history.pushState(stateFor(id),'');
+      else history.replaceState(stateFor(id),'');
+    }catch(_){ }
+    render(id);
+  };
+
+  // Capture phase is intentional: it runs before the legacy inline bubble-phase
+  // popstate listener, then stops that obsolete handler from adding/replaying its
+  // private _pageHistory stack. The browser has already moved the history index;
+  // we only render the state it selected.
+  window.addEventListener('popstate',function(event){
+    try{event.stopImmediatePropagation();}catch(_){ }
+    var page=statePage(event.state);
+    if(page)render(page);
+    // If page is null, this history entry is outside QiblaAstro. Do nothing:
+    // Android/Chrome owns the navigation and may close/minimize the TWA normally.
+  },true);
+
+  window.__qiblaBackNavigation={version:VERSION,owner:'home-final',stateKey:KEY};
+})();
+
 /* Serenity is intentionally isolated from Home/Compass engines. This loader only attaches
    the Quran streaming presentation module after the document is available. */
 (function(){
