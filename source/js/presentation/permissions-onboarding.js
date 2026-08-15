@@ -42,13 +42,49 @@ function toast(text){
   ensureStyle();var old=root.document.getElementById('qa-permission-toast');if(old)old.remove();
   var n=root.document.createElement('div');n.id='qa-permission-toast';n.className='qa-permission-toast';n.textContent=text;root.document.body.appendChild(n);root.setTimeout(function(){if(n&&n.parentNode)n.remove();},4200);
 }
-function requestLocation(){
-  return new Promise(function(resolve){
-    if(!root.navigator.geolocation){resolve('unsupported');return;}
+async function queryLocationPermission(){
+  try{
+    if(!root.navigator.permissions||typeof root.navigator.permissions.query!=='function')return null;
+    var status=await root.navigator.permissions.query({name:'geolocation'});
+    return status&&status.state?status.state:null;
+  }catch(_){return null;}
+}
+async function requestLocation(){
+  if(!root.navigator.geolocation)return 'unsupported';
+
+  var before=await queryLocationPermission();
+  if(before==='granted')return 'granted';
+  if(before==='denied')return 'denied';
+
+  var result=await new Promise(function(resolve){
     var done=false;function finish(v){if(done)return;done=true;resolve(v);}
-    try{root.navigator.geolocation.getCurrentPosition(function(){finish('granted');},function(err){finish(err&&err.code===1?'denied':'unavailable');},{enableHighAccuracy:true,timeout:12000,maximumAge:0});}
-    catch(_){finish('unavailable');}
+    try{
+      root.navigator.geolocation.getCurrentPosition(
+        function(){finish('granted');},
+        function(err){
+          if(err&&err.code===1){finish('denied');return;}
+          /* POSITION_UNAVAILABLE (2) and TIMEOUT (3) mean location could not be
+             resolved now; they are not a permission denial. The onboarding is
+             responsible only for permission state, while the GNSS runtime owns
+             acquisition of an actual fix. */
+          finish('not-denied');
+        },
+        {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+      );
+    }catch(_){finish('not-denied');}
   });
+
+  if(result==='granted'||result==='denied')return result;
+
+  var after=await queryLocationPermission();
+  if(after==='granted')return 'granted';
+  if(after==='denied')return 'denied';
+
+  /* If the Geolocation API progressed past permission denial but no fix was
+     available, do not trap the user in onboarding. This records only that the
+     permission was not rejected; GNSS will continue to acquire coordinates in
+     its existing runtime path. */
+  return 'granted';
 }
 function requestWebNotifications(){
   try{
