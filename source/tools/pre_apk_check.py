@@ -17,7 +17,7 @@ EXPECTED_VERSION_NAME = "3.1.0"
 EXPECTED_VERSION_CODE = "3"
 EXPECTED_GA4 = "G-1D1GKVZB74"
 EXPECTED_DOMAIN = "app.qiblalabs.com"
-EXPECTED_SW_VERSION = "qiblaastro-v6.11-quran-nested-back"
+EXPECTED_SW_VERSION = "qiblaastro-v6.12-quran-azkar-nested-back"
 
 errors: list[str] = []
 notes: list[str] = []
@@ -82,6 +82,7 @@ if "privacy-safe-screen-tracker.js" not in navigation: fail("navigation shell do
 if "./js/analytics/privacy-safe-screen-tracker.js" not in service_worker: fail("service worker does not precache the screen analytics tracker")
 if "./js/i18n/prayer-phrases.js" not in service_worker: fail("service worker does not precache the production prayer translation pack")
 if "./js/presentation/quran/back-history.js" not in service_worker: fail("service worker does not precache the modern Quran nested Back bridge")
+if "./js/presentation/azkar/back-history.js" not in service_worker: fail("service worker does not precache the modern Azkar nested Back bridge")
 if EXPECTED_SW_VERSION not in service_worker: fail(f"service worker version must be {EXPECTED_SW_VERSION}")
 notes.append("GA4 screen analytics is non-essential and limited to stable screen names, surface type, views and active-screen duration")
 notes.append("Application functionality must remain independent of analytics/cookie consent")
