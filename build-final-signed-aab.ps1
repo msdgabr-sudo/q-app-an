@@ -53,8 +53,19 @@ Write-Host 'Enter the keystore password only into local keytool/jarsigner/apksig
 Write-Host 'Never commit the keystore or password to GitHub.' -ForegroundColor Yellow
 
 Write-Host '[1/15] Verify external upload key identity...' -ForegroundColor Yellow
-$KeyInfo = (& keytool -list -v -keystore $ResolvedKeystore -alias $ExpectedAlias 2>&1 | Out-String)
-if ($LASTEXITCODE -ne 0) { throw 'Upload key verification failed.' }
+$SavedErrorActionPreference = $ErrorActionPreference
+try {
+    # Windows PowerShell 5.1 can surface keytool's interactive password prompt from stderr
+    # as a NativeCommandError when ErrorActionPreference is Stop. Temporarily permit the
+    # native prompt while still checking keytool's exit code and parsing the certificate.
+    $ErrorActionPreference = 'Continue'
+    $KeyInfo = (& keytool -list -v -keystore $ResolvedKeystore -alias $ExpectedAlias 2>&1 | Out-String)
+    $KeytoolExitCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $SavedErrorActionPreference
+}
+if ($KeytoolExitCode -ne 0) { throw 'Upload key verification failed.' }
 $KeyInfo | Out-Host
 $FingerprintMatch = [regex]::Match($KeyInfo, 'SHA256:\s*([0-9A-Fa-f:]+)')
 if (-not $FingerprintMatch.Success) { throw 'Could not read SHA-256 fingerprint from the upload keystore.' }
