@@ -3,6 +3,7 @@ name: Deploy app.qiblalabs.com
 on:
   push:
     branches:
+      - main
       - release/aab-3.1.0
     paths:
       - 'source/**'
@@ -48,8 +49,6 @@ jobs:
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload website artifact
         uses: actions/upload-pages-artifact@v3
