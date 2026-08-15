@@ -1,70 +1,51 @@
-name: Materialize frozen Mizan source
+name: Historical frozen-source provenance audit (read-only)
+
+# HISTORICAL SAFETY WORKFLOW
+# --------------------------
+# q-app-an now uses `main` as its single working/release branch.
+# This workflow MUST NOT materialize, replace, commit, or push `source/`.
+# The SHA below records the Mizan baseline from which q-app-an/source was
+# originally materialized. Current `main/source` intentionally contains
+# validated post-baseline fixes and is the source of truth.
+# Run this workflow manually only when auditing provenance.
 
 on:
-  push:
-    branches: [release/aab-3.1.0]
-    paths:
-      - '.github/workflows/materialize-frozen-source.yml'
-      - 'RELEASE_SOURCE.md'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
-  SOURCE_REPO: https://github.com/msdgabr-sudo/Mizan.git
   SOURCE_SHA: 6e49775df5742413371a4165ea985173c43f5f5e
 
 jobs:
-  materialize:
+  provenance-audit:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: release/aab-3.1.0
+          ref: main
           fetch-depth: 1
 
-      - name: Fetch exact approved source commit
+      - name: Verify historical baseline marker
         run: |
           set -euo pipefail
-          rm -rf /tmp/mizan-source source
-          mkdir -p /tmp/mizan-source source
-          git -C /tmp/mizan-source init
-          git -C /tmp/mizan-source remote add origin "$SOURCE_REPO"
-          git -C /tmp/mizan-source fetch --depth=1 origin "$SOURCE_SHA"
-          ACTUAL=$(git -C /tmp/mizan-source rev-parse FETCH_HEAD)
+          test -f source/.release-source-sha
+          ACTUAL="$(tr -d '\r\n' < source/.release-source-sha)"
           test "$ACTUAL" = "$SOURCE_SHA"
-          git -C /tmp/mizan-source archive "$ACTUAL" | tar -x -C source
-          printf '%s\n' "$ACTUAL" > source/.release-source-sha
+          echo "Historical Mizan baseline: $ACTUAL"
+          echo "Current main/source is authoritative and MUST NOT be overwritten from this baseline."
 
-      - name: Reject secrets and generated signing material
+      - name: Confirm repository contains no signing secrets
         run: |
           set -euo pipefail
           if find source -type f \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*service-account*.json' \) -print -quit | grep -q .; then
-            echo 'ERROR: signing secret or service-account material exists in frozen source.' >&2
+            echo 'ERROR: signing secret or service-account material exists in repository source.' >&2
             exit 1
           fi
           test ! -e source/android-twa/keystore/qiblaastro-upload.jks
 
-      - name: Verify frozen release identity before commit
+      - name: Provenance audit complete
         run: |
-          set -euo pipefail
-          cd source
-          python3 tools/pre_apk_check.py
-          python3 android-twa/check_twa_config.py
-          node tests/timezone-production-wiring.test.js
-          node tests/native-android-localization-security.test.js
-          node tests/pre-native-release-readiness.test.js
-
-      - name: Commit immutable source snapshot into release repository
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A source
-          if git diff --cached --quiet; then
-            echo 'Frozen source already materialized; nothing to commit.'
-            exit 0
-          fi
-          git commit -m "release: materialize Mizan ${SOURCE_SHA}"
-          git push origin HEAD:release/aab-3.1.0
+          echo 'PASS: historical provenance marker is intact.'
+          echo 'READ-ONLY: no source files were materialized, replaced, committed, or pushed.'
