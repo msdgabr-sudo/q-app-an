@@ -9,6 +9,8 @@ function exists(p){assert(fs.existsSync(p),`required file missing: ${p}`);}
   'js/presentation/permissions-onboarding.js',
   'js/presentation/quran/host.js',
   'js/presentation/quran/back-history.js',
+  'js/presentation/azkar/host.js',
+  'js/presentation/azkar/back-history.js',
   'tests/wmm2025-official-gate.js',
   'tests/wmm2025-global-coverage.test.js',
   'tests/wmm2025-runtime-integration.test.js',
@@ -50,8 +52,7 @@ assert(/if\(current===['\"]home['\"]\)history\.pushState\(stateFor\(id\)/.test(h
 assert(/else\s+history\.replaceState\(stateFor\(id\)/.test(homeFinal),'internal-to-internal navigation must replace the single internal entry');
 assert(/window\.addEventListener\(['\"]popstate['\"],function\(event\)[\s\S]*stopImmediatePropagation\(\)/.test(homeFinal),'parent capture-phase popstate handler must neutralize the obsolete inline parent listener');
 
-// The visible Quran screen is NOT the legacy inline qr-reader. It is the modern
-// same-origin iframe pages/quran.html mounted by presentation/quran/host.js.
+// The visible Quran screen is the modern same-origin iframe pages/quran.html.
 const quranHost=fs.readFileSync('js/presentation/quran/host.js','utf8');
 const quranPage=fs.readFileSync('pages/quran.html','utf8');
 const quranBack=fs.readFileSync('js/presentation/quran/back-history.js','utf8');
@@ -63,15 +64,33 @@ assert(/presentation\/quran\/back-history\.js/.test(quranHost),'Quran host must 
 assert(/var\s+KEY=['\"]qiblaastroQuranNav['\"]/.test(quranBack),'Quran nested history must use an isolated iframe-local state key');
 assert(/new\s+MutationObserver/.test(quranBack),'Quran bridge must observe the real modern reader visibility rather than the obsolete parent reader');
 assert(/history\.pushState\(stateFor\(true\)/.test(quranBack),'opening the modern Quran reader must add exactly one iframe child history entry');
-assert(/observer\.observe\(reader,\{attributes:true,attributeFilter:\[['\"]class['\"]\]\}\)/.test(quranBack),'Quran bridge must observe only the reader class transition');
 assert(/back\.addEventListener\(['\"]click['\"],[\s\S]*history\.back\(\)[\s\S]*\},true\)/.test(quranBack),'visible Quran reader Back control must consume the same iframe history entry in capture phase');
 assert(/root\.addEventListener\(['\"]popstate['\"],[\s\S]*showIndexViaExistingControl\(\)/.test(quranBack),'Android/browser Back inside the iframe must return the modern reader to the Quran index');
-assert(/back\.click\(\)/.test(quranBack),'nested Back must reuse the Quran screen existing Back control instead of duplicating reader logic');
+
+// Azkar is also a modern same-origin iframe with two child views: Reader and Audio.
+// Its child history must remain entirely presentation-local and must reuse AzkarPage.
+const azkarHost=fs.readFileSync('js/presentation/azkar/host.js','utf8');
+const azkarPage=fs.readFileSync('pages/azkar.html','utf8');
+const azkarBack=fs.readFileSync('js/presentation/azkar/back-history.js','utf8');
+assert(/FRAME_SRC=['\"]pages\/azkar\.html['\"]/.test(azkarHost),'modern Azkar iframe source must remain pages/azkar.html');
+assert(/frame\.id=['\"]qa-azkar-frame['\"]/.test(azkarHost),'modern Azkar must remain mounted in qa-azkar-frame');
+assert(azkarPage.includes('id="azHome"')&&azkarPage.includes('id="azReader"')&&azkarPage.includes('id="azAudio"'),'modern Azkar iframe contract must expose Home, Reader and Audio views');
+assert(/function\s+wireBackHistory\s*\(frame\)/.test(azkarHost),'Azkar host must install the iframe-local Back bridge');
+assert(/presentation\/azkar\/back-history\.js/.test(azkarHost),'Azkar host must load the dedicated iframe-local Back bridge');
+assert(/var\s+KEY=['\"]qiblaastroAzkarNav['\"]/.test(azkarBack),'Azkar nested history must use an isolated iframe-local state key');
+assert(/new\s+MutationObserver/.test(azkarBack),'Azkar bridge must observe the real modern Azkar child-view transitions');
+assert(/history\.pushState\(stateFor\('reader',cat\)/.test(azkarBack),'opening an Azkar category must add one Reader child history entry');
+assert(/history\.pushState\(stateFor\('audio'\)/.test(azkarBack),'opening Azkar audio reminders must add one Audio child history entry');
+assert(/root\.history\.back\(\)/.test(azkarBack),'visible Azkar child Back controls must consume the child history entry instead of creating a second path');
+assert(/root\.addEventListener\(['\"]popstate['\"],[\s\S]*renderState\(nav\)/.test(azkarBack),'Android/browser Back inside the Azkar iframe must render the browser-selected child state');
+assert(/AzkarPage\.openCategory/.test(azkarBack)&&/AzkarPage\.openAudio/.test(azkarBack)&&/AzkarPage\.home/.test(azkarBack),'Azkar bridge must reuse existing public presentation controls rather than duplicate counter/audio logic');
 
 const serviceWorker=fs.readFileSync('service-worker.js','utf8');
 assert(serviceWorker.includes("'./js/home-final.js'"),'service worker must critical-cache the guaranteed parent runtime entry point');
 assert(serviceWorker.includes("'./js/presentation/quran/host.js'"),'service worker must critical-cache the modern Quran host');
 assert(serviceWorker.includes("'./js/presentation/quran/back-history.js'"),'service worker must critical-cache the Quran nested Back bridge');
+assert(serviceWorker.includes("'./js/presentation/azkar/host.js'"),'service worker must critical-cache the modern Azkar host');
+assert(serviceWorker.includes("'./js/presentation/azkar/back-history.js'"),'service worker must critical-cache the Azkar nested Back bridge');
 assert(/fetch\(r,\{cache:['\"]no-store['\"]\}\)/.test(serviceWorker),'service worker must network-refresh JS/CSS/HTML instead of pinning stale navigation code');
 
 const core=fs.readFileSync('js/04-core.js','utf8');
@@ -84,8 +103,8 @@ for(const p of treeCandidates)assert(!fs.existsSync(p),`unexpected native projec
 
 console.log('A2 pre-native Web/PWA release-readiness structure: PASS');
 console.log('Location onboarding: permission grant is separated from GNSS fix readiness; notification prompting remains contextual.');
-console.log('Navigation: parent owns app-level Back; modern Quran iframe owns Reader -> Quran index nested Back.');
-console.log('Service Worker: parent and Quran nested Back presentation bridges are critical-cached with network-first code refresh.');
+console.log('Navigation: parent owns app-level Back; Quran and Azkar iframes own only their nested child Back levels.');
+console.log('Service Worker: parent, Quran and Azkar Back presentation bridges are critical-cached with network-first code refresh.');
 console.log('Timezone status: legacy UTC+3 engine contract is isolated behind verified production civil-time conversion.');
 console.log('Native-source checkpoint remains separately governed by the guarded Bubblewrap/native-injection release path.');
 console.log('This is a pre-native source gate; APK/AAB artifacts still require their dedicated build/signing verification.');
