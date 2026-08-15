@@ -55,11 +55,10 @@ Write-Host 'Never commit the keystore or password to GitHub.' -ForegroundColor Y
 Write-Host '[1/15] Verify external upload key identity...' -ForegroundColor Yellow
 $SavedErrorActionPreference = $ErrorActionPreference
 try {
-    # Windows PowerShell 5.1 can surface keytool's interactive password prompt from stderr
-    # as a NativeCommandError when ErrorActionPreference is Stop. Temporarily permit the
-    # native prompt while still checking keytool's exit code and parsing the certificate.
+    # Keep stderr attached to the console so keytool's interactive password prompt is visible.
+    # Capture stdout only for certificate parsing, while temporarily allowing native stderr.
     $ErrorActionPreference = 'Continue'
-    $KeyInfo = (& keytool -list -v -keystore $ResolvedKeystore -alias $ExpectedAlias 2>&1 | Out-String)
+    $KeyInfo = (& keytool -list -v -keystore $ResolvedKeystore -alias $ExpectedAlias | Out-String)
     $KeytoolExitCode = $LASTEXITCODE
 }
 finally {
