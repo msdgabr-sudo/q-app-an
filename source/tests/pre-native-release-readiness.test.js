@@ -6,6 +6,7 @@ function exists(p){assert(fs.existsSync(p),`required file missing: ${p}`);}
 [
   'js/geomag/wmm2025.js',
   'js/geomag/wmm2025-runtime.js',
+  'js/presentation/permissions-onboarding.js',
   'tests/wmm2025-official-gate.js',
   'tests/wmm2025-global-coverage.test.js',
   'tests/wmm2025-runtime-integration.test.js',
@@ -26,6 +27,14 @@ assert(/gnssSource\s*=\s*['\"]unresolved['\"]/.test(gnss),'GNSS must start unres
 assert(!/get\.geojs|freeipapi|ipwhois/.test(gnss),'sensitive runtime must not call IP geolocation services');
 assert(/function\s+tryIPGeo\s*\(\)/.test(gnss),'compatibility alias may remain');
 
+const permissions=fs.readFileSync('js/presentation/permissions-onboarding.js','utf8');
+assert(/function\s+queryLocationPermission\s*\(/.test(permissions),'onboarding must inspect the browser/TWA geolocation permission state');
+assert(/if\(err&&err\.code===1\)\{finish\('denied'\)/.test(permissions),'only PERMISSION_DENIED may classify location permission as denied');
+assert(/finish\('granted'\);\s*\n\s*\}/.test(permissions),'position timeout/unavailable must not be confused with a denied permission');
+assert(/var\s+notificationResult=currentWebNotificationState\(\)/.test(permissions),'first-run onboarding must not launch a competing notification prompt');
+assert(!/var\s+notificationPromise=requestWebNotifications\(\)/.test(permissions),'legacy concurrent notification/location permission request must remain removed');
+assert(/typeof\s+root\.tryBrowserGPS===['\"]function['\"]/.test(permissions),'successful permission onboarding must hand off to the existing trusted GNSS path');
+
 const core=fs.readFileSync('js/04-core.js','utf8');
 assert(/const\s+UTC_OFF\s*=\s*3\s*;/.test(core),'legacy solar-event UTC+3 contract must remain explicit behind the isolated civil-time adapter');
 const timezoneAudit=fs.readFileSync('checkpoints/PRAYER_TIMEZONE_AUDIT_2026-08-14.md','utf8');
@@ -35,6 +44,7 @@ const treeCandidates=['AndroidManifest.xml','build.gradle','build.gradle.kts','s
 for(const p of treeCandidates)assert(!fs.existsSync(p),`unexpected native project root appeared outside the guarded Bubblewrap generation path: ${p}`);
 
 console.log('A2 pre-native Web/PWA release-readiness structure: PASS');
+console.log('Location onboarding: permission grant is separated from GNSS fix readiness; notification prompting remains contextual.');
 console.log('Timezone status: legacy UTC+3 engine contract is isolated behind verified production civil-time conversion.');
 console.log('Native-source checkpoint remains separately governed by the guarded Bubblewrap/native-injection release path.');
 console.log('This is a pre-native source gate; APK/AAB artifacts still require their dedicated build/signing verification.');
