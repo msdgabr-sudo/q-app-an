@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - release/aab-3.1.0
     paths:
       - 'source/**'
       - '.github/workflows/deploy-app-pages.yml'
