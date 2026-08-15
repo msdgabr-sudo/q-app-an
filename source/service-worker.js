@@ -1,7 +1,7 @@
-/* QiblaAstro Service Worker v6.09 — Quran/Adhkar reading width
+/* QiblaAstro Service Worker v6.10 — Falaki instant astronomy refresh
  * © 2026 Mohamed SG Behairy. All Rights Reserved. */
 'use strict';
-const VERSION='qiblaastro-v6.09-reading-width';
+const VERSION='qiblaastro-v6.10-falaki-instant-refresh';
 const CACHE_PREFIX='qiblaastro-';
 const APP_CACHE=VERSION+'-app';
 const RUNTIME_CACHE=VERSION+'-runtime';
