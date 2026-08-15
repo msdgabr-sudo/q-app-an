@@ -4,6 +4,85 @@
 
 const TABS=['home','compass','prayer','azkar','night','quran','settings','serenity'];
 
+// Android/TWA Back is driven by the browser session history. QiblaAstro uses a
+// single-document UI, so internal screen changes must be represented in History
+// without creating a deep stack: Home is the hub, and one Back from any top-level
+// internal screen returns to Home. Back from Home remains owned by Android/browser.
+const QA_NAV_STATE_KEY='qiblaastroNav';
+const QA_NAV_STATE_VERSION=1;
+var _qaHistoryRender=false;
+var _qaHistoryBackPending=false;
+
+function _qaValidPage(id){
+  return !!(id&&document.getElementById('page-'+id));
+}
+
+function _qaHistoryState(page){
+  var current=history.state;
+  var state=(current&&typeof current==='object'&&!Array.isArray(current))?Object.assign({},current):{};
+  state[QA_NAV_STATE_KEY]={version:QA_NAV_STATE_VERSION,page:page};
+  return state;
+}
+
+function _qaHistoryPage(state){
+  if(!state||typeof state!=='object')return null;
+  var nav=state[QA_NAV_STATE_KEY];
+  if(!nav||nav.version!==QA_NAV_STATE_VERSION||!_qaValidPage(nav.page))return null;
+  return nav.page;
+}
+
+function _qaDomPage(){
+  var id='';
+  try{id=document.body.getAttribute('data-qa-active-page')||'';}catch(_){ }
+  if(_qaValidPage(id))return id;
+  try{
+    var active=document.querySelector('.page.active');
+    if(active&&active.id&&active.id.indexOf('page-')===0){
+      id=active.id.slice(5);
+      if(_qaValidPage(id))return id;
+    }
+  }catch(_){ }
+  return 'home';
+}
+
+function _qaPrimeHistory(){
+  var page=_qaHistoryPage(history.state);
+  if(page)return page;
+  try{history.replaceState(_qaHistoryState('home'),'');}catch(_){ }
+  return 'home';
+}
+
+function _qaPrepareHistory(id){
+  if(_qaHistoryRender)return true;
+  var currentHistory=_qaPrimeHistory();
+  var currentDom=_qaDomPage();
+
+  if(id==='home'){
+    // A screen-owned Home control should consume the single internal history
+    // entry rather than leave a duplicate Home entry behind. The popstate event
+    // performs the actual render. If we are already on Home, do not intercept
+    // Back; Android/browser remains free to leave the app normally.
+    if(currentDom!=='home'&&currentHistory!=='home'&&!_qaHistoryBackPending){
+      _qaHistoryBackPending=true;
+      try{history.back();return false;}catch(_){_qaHistoryBackPending=false;}
+    }
+    try{history.replaceState(_qaHistoryState('home'),'');}catch(_){ }
+    return true;
+  }
+
+  try{
+    if(currentHistory==='home')history.pushState(_qaHistoryState(id),'');
+    else history.replaceState(_qaHistoryState(id),'');
+  }catch(_){ }
+  return true;
+}
+
+function _qaRenderHistoryPage(id){
+  if(!_qaValidPage(id))return;
+  _qaHistoryRender=true;
+  try{GT(id);}finally{_qaHistoryRender=false;}
+}
+
 function _qaEnsureInternalHome(page,id){
   if(!page || id==='home') return;
   // Reuse a screen-owned Home control when one already exists; never duplicate it.
@@ -48,6 +127,9 @@ function _qaFinalizeNavigation(id,page){
 
 function GT(id){
   if(!id)id='home';
+  if(!_qaValidPage(id)){console.error('Missing page:','page-'+id);return;}
+  if(!_qaPrepareHistory(id))return;
+
   document.body.classList.toggle('qa-internal-screen',id!=='home');
   document.body.classList.toggle('tab-home',id==='home');
   document.body.classList.toggle('hide-topbar',true);
@@ -62,7 +144,6 @@ function GT(id){
   });
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   var page=document.getElementById('page-'+id);
-  if(!page){console.error('Missing page:','page-'+id);return;}
   page.classList.add('active');
   _qaEnsureInternalHome(page,id);
   _qaResetPageScroll(page);
@@ -92,6 +173,25 @@ function GT(id){
 
   _qaFinalizeNavigation(id,page);
 }
+
+// Establish Home as the current document's history root without changing the URL.
+_qaPrimeHistory();
+
+window.addEventListener('popstate',function(event){
+  _qaHistoryBackPending=false;
+  var page=_qaHistoryPage(event.state);
+  // A state outside QiblaAstro belongs to the browser/Android. Do not trap it.
+  if(!page)return;
+  _qaRenderHistoryPage(page);
+});
+
+// If the document itself is reloaded while an internal history state is active,
+// restore that screen after all modules are available instead of corrupting the
+// history stack or forcing an exit.
+window.addEventListener('load',function(){
+  var page=_qaHistoryPage(history.state);
+  if(page&&page!==_qaDomPage())_qaRenderHistoryPage(page);
+});
 
 /* Analytics is intentionally isolated from navigation logic. This loader only attaches
    the privacy-safe screen/view timer; it does not change GT(), sensors or page state. */
