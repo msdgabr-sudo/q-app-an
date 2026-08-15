@@ -1,28 +1,54 @@
-# QiblaAstro ELITE 3.1.0 — Final AAB Source Lock
+# QiblaAstro ELITE 3.1.0 — Release Source and Provenance
 
-This branch is reserved for the final Android App Bundle packaging stage.
+> Read `REPOSITORY_STATE.md` before release, branch, source-materialization, or recovery work.
 
-## Frozen source
+## Current source of truth
 
-- Source repository: `msdgabr-sudo/Mizan`
-- Source branch: `a2-release-prep`
-- Approved source commit: `6e49775df5742413371a4165ea985173c43f5f5e`
-- Materialized snapshot directory: `source/`
+The authoritative application and Android release source is now:
+
+- Repository: `msdgabr-sudo/q-app-an`
+- Working/release branch: **`main`**
+- Source directory: `source/`
 - Package ID: `com.qiblalabs`
 - Version name: `3.1.0`
 - Version code: `3`
-- Current Play release shown during handoff: version `1.0.0`, version code `1`
 - Minimum SDK: `23`
 - Compile SDK: `36`
 - Target SDK: `36`
 - TWA origin: `https://app.qiblalabs.com`
 
-## Acceptance evidence before handoff
+The repository is being consolidated to one working branch. `release/aab-3.1.0` is historical and must receive no new product changes. It may be deleted only after the immutable consolidation tag described in `REPOSITORY_STATE.md` has been created remotely and verified.
 
-At the approved source commit, both the complete pre-native release gate and the APK Release Candidate workflow completed successfully. The APK workflow verified generated Android identity, API level, required permissions, forbidden permissions, native Azkar reminders, authenticated prayer notifications, local Adhan integration, authenticated Widget integration and the native launcher bridge, then produced the APK RC artifact.
+## Historical Mizan baseline provenance
+
+The `source/` directory was originally materialized from:
+
+- Source repository: `msdgabr-sudo/Mizan`
+- Historical source branch: `a2-release-prep`
+- Historical approved baseline commit: `6e49775df5742413371a4165ea985173c43f5f5e`
+
+`source/.release-source-sha` retains that SHA as a **provenance marker**.
+
+This SHA is **not an instruction to replace current `main/source`**. Current main intentionally includes validated post-baseline fixes, including location-permission and Falaki runtime/presentation fixes. Re-materializing the historical Mizan baseline over `main/source` would discard valid current work and is forbidden unless the repository owner explicitly authorizes a recovery operation after a separate audit.
+
+The old materialization workflow is therefore retained only as a manual read-only provenance audit. It must not write to `source/` or push generated source commits.
+
+## Immutable consolidation reference
+
+Required reference tag:
+
+`qiblaastro-3.1.0-single-branch-reference`
+
+The tag is a fixed historical checkpoint for recovery/audit after consolidation. It is **not a development branch** and must never be moved, force-updated, rewritten, or reused for a later release. See `REPOSITORY_STATE.md` for the mandatory creation/deletion order.
+
+## Acceptance evidence from historical handoff
+
+At historical Mizan baseline `6e49775df5742413371a4165ea985173c43f5f5e`, both the complete pre-native release gate and APK Release Candidate workflow completed successfully. The APK workflow verified generated Android identity, API level, required permissions, forbidden permissions, native Azkar reminders, authenticated prayer notifications, local Adhan integration, authenticated Widget integration and the native launcher bridge, then produced the APK RC artifact.
 
 APK RC workflow run: `31848703422`
 APK RC artifact digest: `sha256:f882e633388e6174a4419ece1c6ea96fa669df0cdd4ef3ca4b3a93a0fbc767e1`
+
+This historical evidence establishes the handoff baseline. Current `main` must additionally pass the current main release-verification workflow before any new Android package is treated as release-ready.
 
 ## Verified signing identities
 
@@ -36,25 +62,28 @@ Local upload keystore SHA-256, independently checked with `keytool` and matched 
 
 Expected local upload-key alias: `qiblaastro`.
 
-The frozen `assetlinks.json` already contains the current Play App Signing fingerprint above. It also retains a second historical Play app-signing fingerprint; repository history records that addition as `fix(twa): trust both Play app-signing fingerprints`, so it is retained rather than removed without a certificate-rotation audit.
+The current Digital Asset Links configuration contains the Play App Signing fingerprint above and retains the second historical Play app-signing fingerprint documented in repository history. Do not remove certificate fingerprints without a certificate-rotation audit.
 
-## Final AAB invariants
+## Release invariants
 
-The final AAB must preserve the frozen application behavior and scientific engines. Final packaging may not alter QT, WMM2025, digital-compass mathematics, astronomical verification/camera calculations, prayer calculation equations or Quran/Azkar content.
+Release packaging may not casually alter protected application behavior or scientific engines. In particular, preserve:
 
-The final build must include:
-- localized native Azkar reminders;
-- authenticated prayer notifications and local Adhan audio;
-- authenticated home Widget;
-- `QiblaLauncherActivity` with per-install token in URL fragment;
-- no legacy `WidgetDataActivity`;
-- no advertising ID permission for this ad-free release;
-- no exact-alarm permission unless a separately approved release policy changes it.
+- QT / computational Qibla mathematics;
+- WMM2025 magnetic-declination mathematics;
+- digital-compass mathematics;
+- astronomical verification/camera calculations;
+- prayer calculation equations;
+- trusted GNSS security policy;
+- Quran/Azkar content unless explicitly scoped and reviewed.
+
+The release must include the approved native integrations, including localized Azkar reminders, authenticated prayer notifications and local Adhan audio, authenticated home Widget, and `QiblaLauncherActivity` with its guarded per-install token behavior.
+
+This ad-free release must not gain advertising-ID permission, and exact-alarm permission must not be introduced without a separately approved policy change.
 
 ## Signing boundary
 
 The upload keystore and all signing passwords are external secrets. They must never be committed. Expected key file is `qiblaastro-upload.jks`, alias `qiblaastro`.
 
-The repository build gate produces an unsigned AAB proof from the materialized source. Final signing is performed locally with the verified upload keystore using `build-final-signed-aab.ps1`; the wrapper temporarily places the key in the ignored source keystore directory and removes it when finished.
+The GitHub release gate builds an unsigned AAB proof from current `main/source`. Final signing is performed locally with the verified upload keystore using `build-final-signed-aab.ps1`; the wrapper temporarily places the key in the ignored source keystore directory and removes it when finished.
 
 Before Play upload, verify the final signed AAB and generated hashes. Google Play will re-sign distributed APKs with the Play App Signing certificate above.
