@@ -4,6 +4,85 @@
 
 const TABS=['home','compass','prayer','azkar','night','quran','settings','serenity'];
 
+/* Android/TWA hardware-back contract.
+   QiblaAstro is a single-document app: GT() changes visible screens without changing
+   the browser URL. Without same-document history entries Android Back leaves the TWA.
+   Keep a small app-owned navigation stack and mirror it into History only on installed
+   app/TWA surfaces. Home is a terminal screen: Back on Home is consumed and re-armed. */
+var _qaNavStack=['home'];
+var _qaHistoryReady=false;
+var _qaHistoryPop=false;
+
+function _qaIsInstalledAppSurface(){
+  try{
+    var q=new URLSearchParams(window.location.search||'');
+    if(q.get('twa')==='1'){
+      try{window.sessionStorage.setItem('qiblaastro:twa','1');}catch(_){ }
+      return true;
+    }
+    try{if(window.sessionStorage.getItem('qiblaastro:twa')==='1')return true;}catch(_){ }
+    if(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)return true;
+    if(window.navigator&&window.navigator.standalone)return true;
+  }catch(_){ }
+  return false;
+}
+
+function _qaHistoryState(page,guard){
+  return {qiblaastroNav:true,page:page||'home',guard:guard||''};
+}
+
+function _qaRecordNavigation(id){
+  if(!_qaHistoryReady||_qaHistoryPop)return;
+  try{
+    var current=_qaNavStack.length?_qaNavStack[_qaNavStack.length-1]:'home';
+    if(id==='home'){
+      // Explicit navigation to Home is terminal. Do not leave an internal screen
+      // behind it for the next Android Back press.
+      _qaNavStack=['home'];
+      window.history.replaceState(_qaHistoryState('home','home'),' ',window.location.href);
+      return;
+    }
+    if(current===id)return;
+    _qaNavStack.push(id);
+    window.history.pushState(_qaHistoryState(id,'screen'),' ',window.location.href);
+  }catch(_){ }
+}
+
+function _qaHandleHistoryBack(){
+  if(!_qaHistoryReady||!_qaIsInstalledAppSurface())return;
+  try{
+    if(_qaNavStack.length>1){
+      _qaNavStack.pop();
+      var previous=_qaNavStack[_qaNavStack.length-1]||'home';
+      _qaHistoryPop=true;
+      try{GT(previous);}finally{_qaHistoryPop=false;}
+      return;
+    }
+
+    // Home is the root of the installed app. Consume Back instead of allowing
+    // Chrome/Android to leave the TWA, then add one guard entry for the next press.
+    _qaNavStack=['home'];
+    _qaHistoryPop=true;
+    try{GT('home');}finally{_qaHistoryPop=false;}
+    window.history.pushState(_qaHistoryState('home','home'),' ',window.location.href);
+  }catch(_){
+    _qaHistoryPop=false;
+  }
+}
+
+function _qaInitAndroidBackHistory(){
+  if(_qaHistoryReady||!_qaIsInstalledAppSurface())return;
+  try{
+    _qaNavStack=['home'];
+    window.history.replaceState(_qaHistoryState('home','base'),' ',window.location.href);
+    // A guard entry is required so the first Back press on Home produces popstate
+    // instead of closing the Trusted Web Activity.
+    window.history.pushState(_qaHistoryState('home','home'),' ',window.location.href);
+    window.addEventListener('popstate',_qaHandleHistoryBack);
+    _qaHistoryReady=true;
+  }catch(_){ }
+}
+
 function _qaEnsureInternalHome(page,id){
   if(!page || id==='home') return;
   // Reuse a screen-owned Home control when one already exists; never duplicate it.
@@ -66,6 +145,7 @@ function GT(id){
   page.classList.add('active');
   _qaEnsureInternalHome(page,id);
   _qaResetPageScroll(page);
+  _qaRecordNavigation(id);
 
   if(id!=='compass'&&window._gnssWatchId!=null){
     try{navigator.geolocation.clearWatch(window._gnssWatchId);window._gnssWatchId=null;}catch(e){}
@@ -91,6 +171,12 @@ function GT(id){
   if(ad)ad.style.display='none';
 
   _qaFinalizeNavigation(id,page);
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',_qaInitAndroidBackHistory,{once:true});
+}else{
+  _qaInitAndroidBackHistory();
 }
 
 /* Analytics is intentionally isolated from navigation logic. This loader only attaches
