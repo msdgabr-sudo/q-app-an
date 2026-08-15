@@ -16,6 +16,17 @@ var _qaHistoryPop=false;
 function _qaIsInstalledAppSurface(){
   try{
     var q=new URLSearchParams(window.location.search||'');
+    var hash=String(window.location.hash||'');
+
+    /* The production Play build uses QiblaLauncherActivity, which appends a
+       per-install nativeToken in the URL fragment. This is the strongest runtime
+       signal that the page is running inside our Android TWA and is preserved in
+       sessionStorage so later same-document history entries remain recognised. */
+    if(/^#nativeToken=/.test(hash)){
+      try{window.sessionStorage.setItem('qiblaastro:twa','1');}catch(_){ }
+      return true;
+    }
+
     if(q.get('twa')==='1'){
       try{window.sessionStorage.setItem('qiblaastro:twa','1');}catch(_){ }
       return true;
