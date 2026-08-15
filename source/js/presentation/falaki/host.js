@@ -11,36 +11,6 @@
   function cleanupMirror(){if(mirrorTimer){clearInterval(mirrorTimer);mirrorTimer=null;}if(eventTimer){clearInterval(eventTimer);eventTimer=null;}if(parentObserver){parentObserver.disconnect();parentObserver=null;}if(falakiObserver){falakiObserver.disconnect();falakiObserver=null;}if(eventObserver){eventObserver.disconnect();eventObserver=null;}if(homeObserver){homeObserver.disconnect();homeObserver=null;}}
   function resetHost(host){host.innerHTML='';host.style.padding='0';host.style.background='transparent';host.style.overflow='hidden';host.style.height='100dvh';host.style.minHeight='100dvh';}
   function put(doc,id,value){try{var el=doc&&doc.getElementById(id);if(el&&value!==undefined&&value!==null&&value!==''&&el.textContent!==String(value))el.textContent=value;}catch(_){}}
-  function trustedLocation(){
-    try{
-      if(typeof gnssHasTrustedFix==='undefined'||gnssHasTrustedFix!==true)return null;
-      if(typeof gnssSource==='undefined'||gnssSource!=='gps')return null;
-      var lat=Number(LAT),lon=Number(LON);
-      if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
-      return {
-        lat:lat,
-        lon:lon,
-        alt:(typeof gnssAltitudeMeters!=='undefined'&&Number.isFinite(Number(gnssAltitudeMeters)))?Number(gnssAltitudeMeters):0,
-        accuracy:(typeof gnssAccuracy!=='undefined'&&Number.isFinite(Number(gnssAccuracy)))?Number(gnssAccuracy):null,
-        label:'موقعك الحالي'
-      };
-    }catch(_){return null;}
-  }
-  function pushTrustedLocation(frame){
-    try{
-      var loc=trustedLocation();
-      if(!loc||!frame||!frame.contentWindow)return false;
-      frame.contentWindow.postMessage({
-        type:'qiblaastro-location',
-        lat:loc.lat,
-        lon:loc.lon,
-        alt:loc.alt,
-        accuracy:loc.accuracy,
-        label:loc.label
-      },root.location.origin);
-      return true;
-    }catch(_){return false;}
-  }
   function formatHour(value){
     try{
       if(typeof root.hm==='function')return root.hm(value);
@@ -110,8 +80,8 @@
   function bindMirror(frame){
     try{
       cleanupMirror();
-      var liveRun=function(){pushTrustedLocation(frame);mirrorMoonAltAz(frame);},eventRun=function(){pushTrustedLocation(frame);mirrorEventTimes(frame);};
-      pushTrustedLocation(frame);eventRun();liveRun();setTimeout(eventRun,250);setTimeout(eventRun,1000);setTimeout(eventRun,5000);setTimeout(liveRun,250);setTimeout(liveRun,1000);
+      var liveRun=function(){mirrorMoonAltAz(frame);},eventRun=function(){mirrorEventTimes(frame);};
+      eventRun();liveRun();setTimeout(eventRun,250);setTimeout(eventRun,1000);setTimeout(eventRun,5000);setTimeout(liveRun,250);setTimeout(liveRun,1000);
       mirrorTimer=setInterval(liveRun,1000);eventTimer=setInterval(eventRun,60000);
       var target=root.document&&root.document.getElementById('qaMoonPhase');
       if(target&&typeof MutationObserver!=='undefined'){parentObserver=new MutationObserver(function(){setTimeout(liveRun,0);});parentObserver.observe(target,{childList:true,subtree:true,characterData:true});}
@@ -129,15 +99,7 @@
   }
   function frameContractOk(frame){try{var doc=frame&&frame.contentDocument;return !!(doc&&doc.querySelector('main.shell')&&doc.getElementById('moonAlt')&&doc.getElementById('sunAlt')&&doc.getElementById('moonAz'));}catch(_){return false;}}
   function showFailure(host,message){clearWatchdog();cleanupMirror();loading=false;mounted=false;setState(host,'failed');host.innerHTML='<div role="alert" style="min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;background:#07111f;color:#eef5ff;font-family:inherit;"><div><strong style="display:block;margin-bottom:8px;">تعذر تحميل شاشة فلكي</strong><span style="display:block;opacity:.78;margin-bottom:14px;">'+(message||'تحقق من الاتصال ثم أعد المحاولة.')+'</span><button type="button" data-qa-falaki-retry style="padding:9px 16px;border-radius:10px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.08);color:#eef5ff;font:inherit;cursor:pointer;">إعادة المحاولة</button></div></div>';var retry=host.querySelector('[data-qa-falaki-retry]');if(retry)retry.addEventListener('click',function(){mount(true);},{once:true});}
-  function mount(force){if(mounted&&!force)return true;if(loading&&!force)return false;var host=root.document&&root.document.getElementById('page-night');if(!host)return false;clearWatchdog();cleanupMirror();loading=true;mounted=false;resetHost(host);setState(host,'loading');host.setAttribute('data-presentation-source','pages/falaki.html');var frame=root.document.createElement('iframe');frame.id='qa-falaki-frame';frame.title='فلكي — معلومات فلكية وتعليمية';frame.src=FRAME_SRC;frame.loading='eager';frame.setAttribute('allow','geolocation');frame.style.cssText='display:block;width:100%;height:100dvh;min-height:100dvh;border:0;background:transparent;';frame.addEventListener('load',function(){clearWatchdog();if(!frameContractOk(frame)){showFailure(host,'وصل رد غير صالح بدل شاشة فلكي الحديثة.');return;}loading=false;mounted=true;setState(host,'ready');pushTrustedLocation(frame);bindMirror(frame);root.dispatchEvent(new CustomEvent('qiblaastro:presentation-page-mounted',{detail:{name:'falaki',rootId:'page-night',source:'pages/falaki.html'}}));},{once:true});frame.addEventListener('error',function(){showFailure(host,'فشل تحميل ملف الشاشة الحديثة.');},{once:true});host.appendChild(frame);watchdog=root.setTimeout(function(){if(loading)showFailure(host,'استغرق التحميل وقتًا أطول من المتوقع.');},15000);return true;}
-  root.addEventListener('qiblaastro:navigation-change',function(e){
-    try{
-      if(!e||!e.detail||e.detail.page!=='night')return;
-      if(!trustedLocation()&&typeof root.tryBrowserGPS==='function')root.tryBrowserGPS();
-      var frame=root.document&&root.document.getElementById('qa-falaki-frame');
-      if(frame){root.setTimeout(function(){pushTrustedLocation(frame);},0);root.setTimeout(function(){pushTrustedLocation(frame);},500);}
-    }catch(_){ }
-  });
+  function mount(force){if(mounted&&!force)return true;if(loading&&!force)return false;var host=root.document&&root.document.getElementById('page-night');if(!host)return false;clearWatchdog();cleanupMirror();loading=true;mounted=false;resetHost(host);setState(host,'loading');host.setAttribute('data-presentation-source','pages/falaki.html');var frame=root.document.createElement('iframe');frame.id='qa-falaki-frame';frame.title='فلكي — معلومات فلكية وتعليمية';frame.src=FRAME_SRC;frame.loading='eager';frame.setAttribute('allow','geolocation');frame.style.cssText='display:block;width:100%;height:100dvh;min-height:100dvh;border:0;background:transparent;';frame.addEventListener('load',function(){clearWatchdog();if(!frameContractOk(frame)){showFailure(host,'وصل رد غير صالح بدل شاشة فلكي الحديثة.');return;}loading=false;mounted=true;setState(host,'ready');bindMirror(frame);root.dispatchEvent(new CustomEvent('qiblaastro:presentation-page-mounted',{detail:{name:'falaki',rootId:'page-night',source:'pages/falaki.html'}}));},{once:true});frame.addEventListener('error',function(){showFailure(host,'فشل تحميل ملف الشاشة الحديثة.');},{once:true});host.appendChild(frame);watchdog=root.setTimeout(function(){if(loading)showFailure(host,'استغرق التحميل وقتًا أطول من المتوقع.');},15000);return true;}
   root.QiblaFalakiHost=Object.freeze({mount:mount});
   if(root.document){if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',function(){mount(false);},{once:true});else mount(false);}
 })(typeof globalThis!=='undefined'?globalThis:window);
