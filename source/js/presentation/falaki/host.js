@@ -5,12 +5,46 @@
 (function(root){'use strict';
   var mounted=false,loading=false,mirrorTimer=null,eventTimer=null,parentObserver=null,falakiObserver=null,eventObserver=null,homeObserver=null,watchdog=null;
   var FRAME_SRC='pages/falaki.html';
+  var FALAKI_LOCATION_KEY='qiblaastro:falaki:last-trusted-location:v1';
+  var lastCachedSignature='';
   function cleanText(el){try{return el&&el.textContent?el.textContent.trim():'';}catch(_){return '';}}
   function setState(host,state){if(host)host.setAttribute('data-presentation-state',state);}
   function clearWatchdog(){if(watchdog){root.clearTimeout(watchdog);watchdog=null;}}
   function cleanupMirror(){if(mirrorTimer){clearInterval(mirrorTimer);mirrorTimer=null;}if(eventTimer){clearInterval(eventTimer);eventTimer=null;}if(parentObserver){parentObserver.disconnect();parentObserver=null;}if(falakiObserver){falakiObserver.disconnect();falakiObserver=null;}if(eventObserver){eventObserver.disconnect();eventObserver=null;}if(homeObserver){homeObserver.disconnect();homeObserver=null;}}
   function resetHost(host){host.innerHTML='';host.style.padding='0';host.style.background='transparent';host.style.overflow='hidden';host.style.height='100dvh';host.style.minHeight='100dvh';}
   function put(doc,id,value){try{var el=doc&&doc.getElementById(id);if(el&&value!==undefined&&value!==null&&value!==''&&el.textContent!==String(value))el.textContent=value;}catch(_){}}
+  function validLocation(loc){
+    try{
+      if(!loc)return false;
+      var lat=Number(loc.lat),lon=Number(loc.lon);
+      return Number.isFinite(lat)&&Number.isFinite(lon)&&lat>=-90&&lat<=90&&lon>=-180&&lon<=180;
+    }catch(_){return false;}
+  }
+  function readCachedLocation(){
+    try{
+      var raw=root.localStorage&&root.localStorage.getItem(FALAKI_LOCATION_KEY);if(!raw)return null;
+      var loc=JSON.parse(raw);if(!validLocation(loc)||loc.source!=='gps')return null;
+      return {
+        lat:Number(loc.lat),lon:Number(loc.lon),
+        alt:Number.isFinite(Number(loc.alt))?Number(loc.alt):0,
+        accuracy:Number.isFinite(Number(loc.accuracy))?Number(loc.accuracy):null
+      };
+    }catch(_){return null;}
+  }
+  function cacheTrustedLocation(loc){
+    try{
+      if(!validLocation(loc)||!root.localStorage)return false;
+      var payload={
+        lat:Number(loc.lat),lon:Number(loc.lon),
+        alt:Number.isFinite(Number(loc.alt))?Number(loc.alt):0,
+        accuracy:Number.isFinite(Number(loc.accuracy))?Number(loc.accuracy):null,
+        source:'gps',savedAt:Date.now()
+      };
+      var sig=[payload.lat.toFixed(6),payload.lon.toFixed(6),payload.alt.toFixed(1),payload.accuracy===null?'':Math.round(payload.accuracy)].join('|');
+      if(sig===lastCachedSignature)return true;
+      root.localStorage.setItem(FALAKI_LOCATION_KEY,JSON.stringify(payload));lastCachedSignature=sig;return true;
+    }catch(_){return false;}
+  }
   function readTrustedLocation(){
     try{
       if(typeof gnssHasTrustedFix==='undefined'||gnssHasTrustedFix!==true)return null;
@@ -25,9 +59,14 @@
       };
     }catch(_){return null;}
   }
+  function locationForFalaki(){
+    var live=readTrustedLocation();
+    if(live){cacheTrustedLocation(live);return live;}
+    return readCachedLocation();
+  }
   function syncFalakiLocation(frame){
     try{
-      var loc=readTrustedLocation();
+      var loc=locationForFalaki();
       if(!loc||!frame||!frame.contentWindow)return false;
       var api=frame.contentWindow.FalakiPage;
       if(!api||typeof api.setLocation!=='function')return false;
