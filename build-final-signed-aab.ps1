@@ -21,6 +21,54 @@ function Require-Command([string]$Name) {
     }
 }
 
+function Test-Jdk17Home([string]$Home) {
+    if (-not $Home) { return $false }
+    $JavaExe = Join-Path $Home 'bin\java.exe'
+    if (-not (Test-Path -LiteralPath $JavaExe -PathType Leaf)) { return $false }
+    $SavedPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $VersionText = (& $JavaExe -version 2>&1 | Out-String)
+        $ExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $SavedPreference
+    }
+    if ($ExitCode -ne 0) { return $false }
+    return ($VersionText -match '(?m)^(?:openjdk|java) version "17(?:\.|\")')
+}
+
+function Resolve-Jdk17Home {
+    $Candidates = New-Object System.Collections.Generic.List[string]
+    if ($env:JAVA_HOME) { $Candidates.Add($env:JAVA_HOME) }
+
+    $AdoptiumRoot = 'C:\Program Files\Eclipse Adoptium'
+    if (Test-Path -LiteralPath $AdoptiumRoot -PathType Container) {
+        Get-ChildItem -LiteralPath $AdoptiumRoot -Directory -Filter 'jdk-17*' -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object { $Candidates.Add($_.FullName) }
+    }
+
+    $JavaRoot = 'C:\Program Files\Java'
+    if (Test-Path -LiteralPath $JavaRoot -PathType Container) {
+        Get-ChildItem -LiteralPath $JavaRoot -Directory -Filter 'jdk-17*' -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object { $Candidates.Add($_.FullName) }
+    }
+
+    $PathJava = Get-Command java -ErrorAction SilentlyContinue
+    if ($PathJava -and $PathJava.Source) {
+        $BinDir = Split-Path -Parent $PathJava.Source
+        $HomeFromPath = Split-Path -Parent $BinDir
+        if ($HomeFromPath) { $Candidates.Add($HomeFromPath) }
+    }
+
+    foreach ($Candidate in ($Candidates | Select-Object -Unique)) {
+        if (Test-Jdk17Home $Candidate) { return (Resolve-Path -LiteralPath $Candidate).Path }
+    }
+    throw 'A compatible JDK 17 installation was not found. Gradle 8.11.1 must not run on JDK 25.'
+}
+
 function Invoke-Utf8BomScriptInPlace([string]$ScriptPath) {
     $ResolvedScript = (Resolve-Path -LiteralPath $ScriptPath).Path
     $ScriptDir = Split-Path -Parent $ResolvedScript
@@ -59,11 +107,18 @@ foreach ($Command in @('python','node','bubblewrap','keytool','jarsigner')) {
     Require-Command $Command
 }
 
+# Pin this child PowerShell build process to JDK 17. This does not modify the user's
+# machine-wide Java configuration and disappears when this PowerShell process exits.
+$BuildJdk = Resolve-Jdk17Home
+$env:JAVA_HOME = $BuildJdk
+$env:Path = (Join-Path $BuildJdk 'bin') + ';' + $env:Path
+
 Write-Host 'QiblaAstro ELITE 3.1.0 - final local signed AAB build' -ForegroundColor Cyan
 Write-Host "Frozen source: $ExpectedSourceSha"
 Write-Host 'Package: com.qiblalabs'
 Write-Host 'Version: 3.1.0 (code 3)'
 Write-Host 'Target SDK: 36'
+Write-Host "Build JDK: $BuildJdk" -ForegroundColor Green
 Write-Host "Expected upload key SHA-256: $ExpectedUploadSha256"
 Write-Host "Expected alias: $ExpectedAlias"
 Write-Host 'The upload keystore stays outside the frozen source workspace for the entire build.' -ForegroundColor Green
@@ -144,7 +199,7 @@ foreach ($RequiredComponent in @('QiblaLauncherActivity','PrayerWidgetSyncActivi
 }
 if ($GeneratedManifestText.Contains('WidgetDataActivity')) { throw 'Legacy WidgetDataActivity must remain absent.' }
 
-Write-Host '[8/15] Bind Gradle to Android SDK 36...' -ForegroundColor Yellow
+Write-Host '[8/15] Bind Gradle to Android SDK 36 and JDK 17...' -ForegroundColor Yellow
 $SdkCandidates = @()
 foreach ($Candidate in @($env:ANDROID_SDK_ROOT, $env:ANDROID_HOME, 'C:\Android')) {
     if ($Candidate -and -not ($SdkCandidates -contains $Candidate)) { $SdkCandidates += $Candidate }
@@ -168,12 +223,18 @@ $ApkSigner = $ApkSignerCandidates | Where-Object { Test-Path -LiteralPath $_ -Pa
 if (-not $ApkSigner) { throw "apksigner.bat was not found under Android Build Tools in $SdkRoot" }
 Set-Content -LiteralPath (Join-Path $AndroidRoot 'local.properties') -Value "sdk.dir=$($SdkRoot.Replace('\','/'))" -Encoding ASCII
 Write-Host "Gradle SDK root: $SdkRoot"
+Write-Host "Gradle JAVA_HOME: $env:JAVA_HOME"
 
 Write-Host '[9/15] Merge release manifest...' -ForegroundColor Yellow
 $GradleWrapper = Join-Path $AndroidRoot 'gradlew.bat'
 if (-not (Test-Path -LiteralPath $GradleWrapper -PathType Leaf)) { throw 'Generated gradlew.bat missing.' }
 Push-Location $AndroidRoot
 try {
+    # Stop any daemon previously launched under another JDK (for example JDK 25), then
+    # print the JVM Gradle will actually use before running the release task.
+    & $GradleWrapper '--stop' | Out-Host
+    & $GradleWrapper '--version' '--no-daemon' | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw 'Gradle JVM verification failed.' }
     & $GradleWrapper ':app:processReleaseMainManifest' '--no-daemon'
     if ($LASTEXITCODE -ne 0) { throw 'Release manifest merge task failed.' }
 } finally {
