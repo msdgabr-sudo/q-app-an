@@ -44,6 +44,7 @@ public final class PrayerWidgetSyncActivity extends Activity {
         e.putString("qibla",safeQibla(d.getQueryParameter("qibla")));
         e.putInt("advance",boundedInt(d.getQueryParameter("advance"),0,30,0));
         e.putString("profile",safeProfile(d.getQueryParameter("profile")));
+        e.putString(PrayerNativeScheduler.KEY_PLAN,safePlan(d.getQueryParameter("plan")));
         String[] ids={"fajr","dhuhr","asr","maghrib","isha"};
         for(String id:ids){
             e.putInt("time_"+id,boundedInt(d.getQueryParameter("t_"+id),0,1439,-1));
@@ -63,4 +64,27 @@ public final class PrayerWidgetSyncActivity extends Activity {
     private String safeText(String s,int max){if(s==null)return "";s=s.replaceAll("[\\p{Cntrl}]","").trim();return s.length()>max?s.substring(0,max):s;}
     private String safeZone(String s){if(s==null||!s.matches("[A-Za-z0-9_+\\-/]{1,64}"))return java.util.TimeZone.getDefault().getID();return s;}
     private String safeQibla(String s){try{double v=Double.parseDouble(s);if(v<0||v>=360)return "";return String.format(java.util.Locale.US,"%.1f",v);}catch(Exception x){return "";}}
+    private String safePlan(String raw){
+        if(raw==null||raw.isEmpty()||raw.length()>2048)return "";
+        String[] days=raw.split("\\|",-1);
+        if(days.length<2||days.length>14)return "";
+        StringBuilder out=new StringBuilder();
+        String previous="";
+        for(String day:days){
+            String[] pair=day.split(":",2);
+            if(pair.length!=2||!pair[0].matches("\\d{4}-\\d{2}-\\d{2}")||(!previous.isEmpty()&&pair[0].compareTo(previous)<=0))return "";
+            String[] mins=pair[1].split(",",-1);
+            if(mins.length!=5)return "";
+            if(out.length()>0)out.append('|');
+            out.append(pair[0]).append(':');
+            for(int i=0;i<mins.length;i++){
+                int minute=boundedInt(mins[i],0,1439,-1);
+                if(minute<0)return "";
+                if(i>0)out.append(',');
+                out.append(minute);
+            }
+            previous=pair[0];
+        }
+        return out.toString();
+    }
 }
