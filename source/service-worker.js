@@ -1,7 +1,7 @@
-/* QiblaAstro Service Worker v6.16 — stable labeled Arabic sky-name cards + real lunar stations
+/* QiblaAstro Service Worker v6.17 — layout-static Arabic sky-name cards + real lunar stations
  * © 2026 Mohamed SG Behairy. All Rights Reserved. */
 'use strict';
-const VERSION='qiblaastro-v6.16-arabic-name-stable';
+const VERSION='qiblaastro-v6.17-arabic-name-layout-static';
 const CACHE_PREFIX='qiblaastro-';
 const APP_CACHE=VERSION+'-app';
 const RUNTIME_CACHE=VERSION+'-runtime';
