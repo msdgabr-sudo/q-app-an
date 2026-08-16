@@ -17,7 +17,7 @@ EXPECTED_VERSION_NAME = "3.1.0"
 EXPECTED_VERSION_CODE = "3"
 EXPECTED_GA4 = "G-1D1GKVZB74"
 EXPECTED_DOMAIN = "app.qiblalabs.com"
-EXPECTED_SW_VERSION = "qiblaastro-v6.13-native-prayer-plan"
+EXPECTED_SW_VERSION = "qiblaastro-v6.14-native-azkar-toggle"
 
 errors: list[str] = []
 notes: list[str] = []
