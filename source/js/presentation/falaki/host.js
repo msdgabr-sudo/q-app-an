@@ -113,30 +113,12 @@
       line('#qa-home .qa-moon-card','qaMoonRiseSet',times.moonrise,times.moonset);
     }catch(_){ }
   }
-  function mirrorHomeArabicNames(frame){
-    try{
-      if(!frame||!frame.contentDocument||!root.document)return false;
-      var doc=frame.contentDocument,moonName=cleanText(doc.getElementById('moonMansion')),sunName=cleanText(doc.getElementById('sunMansion'));
-      function nameOnly(selector,id,value){
-        if(!value||value==='—')return false;
-        var card=root.document.querySelector(selector);if(!card)return false;
-        var el=root.document.getElementById(id);
-        if(!el){
-          el=root.document.createElement('div');el.id=id;el.setAttribute('data-qa-arabic-sky-name','1');
-          el.style.cssText='width:calc(100% - 10px);margin-top:5px;padding:4px 5px;border:1px solid rgba(121,188,229,.22);border-radius:9px;background:rgba(6,24,41,.72);font-size:.52rem;line-height:1.25;color:#f4f7fb;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-          card.appendChild(el);
-        }
-        if(el.textContent!==value)el.textContent=value;return true;
-      }
-      var a=nameOnly('#qa-home .qa-moon-card','qaMoonArabicStation',moonName),b=nameOnly('#qa-home .qa-sun-card','qaSunArabicNaw',sunName);return a||b;
-    }catch(_){return false;}
-  }
   function mirrorEventTimes(frame){
     try{
       if(!frame||!frame.contentDocument)return false;
       var times=eventTimes();if(!times)return false;var doc=frame.contentDocument;
       put(doc,'sunT1',times.sunrise);put(doc,'noon',times.noon);put(doc,'sunT2',times.sunset);put(doc,'moonT1',times.moonrise);put(doc,'moonT2',times.moonset);
-      mirrorHomeEventTimes(times);mirrorHomeArabicNames(frame);return true;
+      mirrorHomeEventTimes(times);return true;
     }catch(_){return false;}
   }
   function mirrorMoonAltAz(frame){
@@ -162,24 +144,24 @@
   function bindMirror(frame){
     try{
       cleanupMirror();
-      var liveRun=function(){syncFalakiLocation(frame);mirrorMoonAltAz(frame);mirrorHomeArabicNames(frame);},eventRun=function(){mirrorEventTimes(frame);};
+      var liveRun=function(){syncFalakiLocation(frame);mirrorMoonAltAz(frame);},eventRun=function(){mirrorEventTimes(frame);};
       syncFalakiLocation(frame);eventRun();liveRun();setTimeout(eventRun,250);setTimeout(eventRun,1000);setTimeout(eventRun,5000);setTimeout(liveRun,250);setTimeout(liveRun,1000);
       mirrorTimer=setInterval(liveRun,1000);eventTimer=setInterval(eventRun,60000);
       var target=root.document&&root.document.getElementById('qaMoonPhase');
       if(target&&typeof MutationObserver!=='undefined'){parentObserver=new MutationObserver(function(){setTimeout(liveRun,0);});parentObserver.observe(target,{childList:true,subtree:true,characterData:true});}
-      var doc=frame.contentDocument,alt=doc&&doc.getElementById('moonAlt'),az=doc&&doc.getElementById('moonAz'),moonName=doc&&doc.getElementById('moonMansion'),sunName=doc&&doc.getElementById('sunMansion');
-      if(typeof MutationObserver!=='undefined'&&(alt||az||moonName||sunName)){falakiObserver=new MutationObserver(liveRun);if(alt)falakiObserver.observe(alt,{childList:true,subtree:true,characterData:true});if(az)falakiObserver.observe(az,{childList:true,subtree:true,characterData:true});if(moonName)falakiObserver.observe(moonName,{childList:true,subtree:true,characterData:true});if(sunName)falakiObserver.observe(sunName,{childList:true,subtree:true,characterData:true});}
+      var doc=frame.contentDocument,alt=doc&&doc.getElementById('moonAlt'),az=doc&&doc.getElementById('moonAz');
+      if(typeof MutationObserver!=='undefined'&&(alt||az)){falakiObserver=new MutationObserver(liveRun);if(alt)falakiObserver.observe(alt,{childList:true,subtree:true,characterData:true});if(az)falakiObserver.observe(az,{childList:true,subtree:true,characterData:true});}
       if(typeof MutationObserver!=='undefined'&&doc){
         var timeIds=['sunT1','noon','sunT2','moonT1','moonT2'],timeNodes=timeIds.map(function(id){return doc.getElementById(id);}).filter(Boolean);
         if(timeNodes.length){eventObserver=new MutationObserver(function(){setTimeout(eventRun,0);});timeNodes.forEach(function(node){eventObserver.observe(node,{childList:true,subtree:true,characterData:true});});}
       }
       if(typeof MutationObserver!=='undefined'&&root.document){
         var home=root.document.getElementById('qa-home');
-        if(home){homeObserver=new MutationObserver(function(mutations){var needs=false;for(var i=0;i<mutations.length;i++){if(mutations[i].type==='childList'){needs=true;break;}}if(needs)setTimeout(function(){eventRun();liveRun();},0);});homeObserver.observe(home,{childList:true,subtree:true});}
+        if(home){homeObserver=new MutationObserver(function(mutations){var needs=false;for(var i=0;i<mutations.length;i++){if(mutations[i].type==='childList'){needs=true;break;}}if(needs)setTimeout(eventRun,0);});homeObserver.observe(home,{childList:true,subtree:true});}
       }
     }catch(_){ }
   }
-  function frameContractOk(frame){try{var doc=frame&&frame.contentDocument;return !!(doc&&doc.querySelector('main.shell')&&doc.getElementById('moonAlt')&&doc.getElementById('sunAlt')&&doc.getElementById('moonAz')&&doc.getElementById('moonMansion')&&doc.getElementById('sunMansion'));}catch(_){return false;}}
+  function frameContractOk(frame){try{var doc=frame&&frame.contentDocument;return !!(doc&&doc.querySelector('main.shell')&&doc.getElementById('moonAlt')&&doc.getElementById('sunAlt')&&doc.getElementById('moonAz'));}catch(_){return false;}}
   function showFailure(host,message){clearWatchdog();cleanupMirror();loading=false;mounted=false;setState(host,'failed');host.innerHTML='<div role="alert" style="min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;background:#07111f;color:#eef5ff;font-family:inherit;"><div><strong style="display:block;margin-bottom:8px;">تعذر تحميل شاشة فلكي</strong><span style="display:block;opacity:.78;margin-bottom:14px;">'+(message||'تحقق من الاتصال ثم أعد المحاولة.')+'</span><button type="button" data-qa-falaki-retry style="padding:9px 16px;border-radius:10px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.08);color:#eef5ff;font:inherit;cursor:pointer;">إعادة المحاولة</button></div></div>';var retry=host.querySelector('[data-qa-falaki-retry]');if(retry)retry.addEventListener('click',function(){mount(true);},{once:true});}
   function mount(force){if(mounted&&!force)return true;if(loading&&!force)return false;var host=root.document&&root.document.getElementById('page-night');if(!host)return false;clearWatchdog();cleanupMirror();loading=true;mounted=false;resetHost(host);setState(host,'loading');host.setAttribute('data-presentation-source','pages/falaki.html');var frame=root.document.createElement('iframe');frame.id='qa-falaki-frame';frame.title='فلكي — معلومات فلكية وتعليمية';frame.src=FRAME_SRC;frame.loading='eager';frame.setAttribute('allow','geolocation');frame.style.cssText='display:block;width:100%;height:100dvh;min-height:100dvh;border:0;background:transparent;';frame.addEventListener('load',function(){clearWatchdog();if(!frameContractOk(frame)){showFailure(host,'وصل رد غير صالح بدل شاشة فلكي الحديثة.');return;}loading=false;mounted=true;setState(host,'ready');syncFalakiLocation(frame);bindMirror(frame);root.dispatchEvent(new CustomEvent('qiblaastro:presentation-page-mounted',{detail:{name:'falaki',rootId:'page-night',source:'pages/falaki.html'}}));},{once:true});frame.addEventListener('error',function(){showFailure(host,'فشل تحميل ملف الشاشة الحديثة.');},{once:true});host.appendChild(frame);watchdog=root.setTimeout(function(){if(loading)showFailure(host,'استغرق التحميل وقتًا أطول من المتوقع.');},15000);return true;}
   root.QiblaFalakiHost=Object.freeze({mount:mount});
