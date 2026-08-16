@@ -6,8 +6,14 @@ function stringNames(xml){return new Set([...xml.matchAll(/<string\s+name="([^"]
 const azkarRequired=['azkar_channel_name','azkar_channel_description','azkar_notification_title','azkar_start_title','azkar_start_message','azkar_start_action','azkar_stop_title','azkar_stop_message','azkar_stop_action','azkar_cancel_action','azkar_permission_required','azkar_started_toast'];
 for(const set of sets){const p=`android-twa/native/azkar-reminders/res/${set}/strings.xml`;assert(fs.existsSync(p),`${p} missing`);const n=stringNames(read(p));for(const k of azkarRequired)assert(n.has(k),`${set} missing ${k}`);}
 const activity=read('android-twa/native/azkar-reminders/AzkarReminderActivity.java');
+const azScheduler=read('android-twa/native/azkar-reminders/AzkarReminderScheduler.java');
 assert(activity.includes('NativeBridgeToken.valid'),'Azkar native bridge must require per-install token');
 assert(activity.includes('POST_NOTIFICATIONS'),'Azkar Android 13 notification permission missing');
+assert(activity.includes('MIN_INTERVAL_MINUTES = 5'),'Azkar native activity must honor the visible five-minute interval');
+assert(activity.includes('AzkarReminderScheduler.stop(this)'),'Azkar native stop action must map directly to the scheduler');
+assert(activity.includes('requestPermissionThenStart();'),'Azkar native start action must proceed directly from the authenticated toggle');
+assert(azScheduler.includes('MIN_INTERVAL_MINUTES = 5'),'Azkar scheduler must honor five-minute reminders');
+assert(azScheduler.includes('setAndAllowWhileIdle'),'Azkar reminders must remain locally scheduled while the app UI is closed');
 const prayerRequired=['prayer_channel_adhan','prayer_channel_notice','prayer_channel_description','prayer_notification_title','prayer_notification_now','prayer_notification_advance','prayer_name_fajr','prayer_name_dhuhr','prayer_name_asr','prayer_name_maghrib','prayer_name_isha'];
 const widgetRequired=['widget_app_name','widget_city_unavailable','widget_refresh_required','widget_value_unavailable','widget_qibla_unavailable','widget_qibla_value'];
 for(const set of sets){let p=`android-twa/native/prayer-widget/res/${set}/strings.xml`;assert(fs.existsSync(p),`${p} missing`);let n=stringNames(read(p));for(const k of prayerRequired)assert(n.has(k),`${set} missing ${k}`);p=`android-twa/native/widget/res/${set}/strings.xml`;n=stringNames(read(p));for(const k of widgetRequired)assert(n.has(k),`${set} missing ${k}`);}
@@ -54,11 +60,17 @@ assert(webSync.includes("maybeAutoSync('location-changed')"),'native prayer sche
 assert(webSync.includes("maybeAutoSync('runtime-ready')"),'native plan must refresh only after the authoritative prayer runtime reports a valid schedule');
 assert(webSync.includes('if(minute<0)return null'),'native prayer sync must fail closed until all five prayer times exist');
 const azWeb=read('js/azkar-native-reminders.js');
+const azPage=read('pages/azkar.html');
 assert(azWeb.includes("token='+encodeURIComponent(token)"),'Azkar web bridge must send authenticated token');
 assert(azWeb.includes('tokenFromHash'),'Azkar bridge must read token from fragment');
+assert(azWeb.includes('tokenFromStorage'),'Azkar bridge must recover the authenticated token from the same-origin TWA session');
+assert(azWeb.includes('Math.max(5,n)'),'Azkar web bridge must honor the visible five-minute interval');
 assert(azWeb.includes("var launched=launch('start'"),'Azkar UI must inspect native launch result before persisting running state');
-assert(azWeb.includes('if(!launched){writeState(null);setUi(false,null);setLaunchFailure();return;}'),'Azkar UI must fail closed when Android launch cannot start');
+assert(azWeb.includes('if(!launched){clearStaleState();return;}'),'Azkar UI must fail closed without showing a false Android error note');
 assert(azWeb.indexOf("var launched=launch('start'")<azWeb.indexOf('writeState(state);setUi(true,state);'),'Azkar UI must not claim a running native reminder before attempting Android launch');
+assert(!azWeb.includes('تعذر بدء تنبيه Android')&&!azWeb.includes('افتح التطبيق من نسخة Android'),'obsolete visible Android failure note must remain removed');
+assert(azPage.includes('#azAudio .az-audio-status{display:none!important}'),'Azkar audio status note must remain hidden; the toggle is the visible state control');
+assert(azPage.includes('azkar-native-reminders.js?v=20260817-native2'),'Azkar page must load the refreshed native reminder bridge');
 const bootstrap=read('js/presentation/bootstrap.js');
 assert(bootstrap.includes('schedule-sync.js?v=20260814-nativebridge1'),'authenticated prayer sync loader version missing');
 const sw=read('service-worker.js');
@@ -68,7 +80,7 @@ console.log('Native Android localization/security gate: PASS');
 console.log('Prayer actual-time + separate pre-alert + local Adhan audio: PASS');
 console.log('Prayer native sync refreshes only after explicit/persisted activation and fails closed before a complete schedule: PASS');
 console.log('Prayer native bridge carries a validated 14-day date-stamped schedule and never replays an exhausted plan: PASS');
-console.log('Azkar native bridge does not claim background start when Android launch fails: PASS');
+console.log('Azkar native toggle + five-minute local background scheduling: PASS');
 console.log('Prayer notifications AR/EN/FR/ID/UR: PASS');
 console.log('Widget AR/EN/FR/ID/UR: PASS');
 console.log('Per-install fragment token + MODE_PRIVATE store; legacy WidgetDataActivity absent: PASS');
