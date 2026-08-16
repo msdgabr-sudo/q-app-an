@@ -12,6 +12,7 @@ import java.util.TimeZone;
 public final class PrayerNativeScheduler {
     public static final String PREFS = "qiblaastro_prayer_native";
     public static final String[] IDS = {"fajr","dhuhr","asr","maghrib","isha"};
+    static final String KEY_PLAN = "plan_v1";
     static final int BASE_REQ = 8400;
     static final int PRE_REQ = 8450;
     private PrayerNativeScheduler() {}
@@ -24,19 +25,53 @@ public final class PrayerNativeScheduler {
         TimeZone tz = TimeZone.getTimeZone(tzId == null ? TimeZone.getDefault().getID() : tzId);
         long now = System.currentTimeMillis();
         int advance = Math.max(0, Math.min(30, p.getInt("advance", 0)));
+        String plan = p.getString(KEY_PLAN, "");
+        boolean dateStamped = plan != null && !plan.isEmpty();
         for (int i=0;i<IDS.length;i++) {
             String id = IDS[i];
             String mode = p.getString("mode_"+id, "off");
             if ("off".equals(mode)) continue;
-            int minute = p.getInt("time_"+id, -1);
-            if (minute < 0 || minute >= 1440) continue;
-            long actual = nextOccurrence(now, minute, tz);
+            long actual;
+            if (dateStamped) {
+                actual = nextPlannedOccurrence(plan, i, now, tz);
+                if (actual <= 0L) continue;
+            } else {
+                int minute = p.getInt("time_"+id, -1);
+                if (minute < 0 || minute >= 1440) continue;
+                actual = nextOccurrence(now, minute, tz);
+            }
             scheduleOne(context, BASE_REQ+i, id, mode, false, actual);
             if (advance > 0) {
                 long pre = actual - advance*60_000L;
                 if (pre > now + 5000L) scheduleOne(context, PRE_REQ+i, id, "notification", true, pre);
             }
         }
+    }
+
+    private static long nextPlannedOccurrence(String plan, int prayerIndex, long now, TimeZone tz) {
+        long best = Long.MAX_VALUE;
+        String[] days = plan.split("\\|");
+        for (String day : days) {
+            String[] pair = day.split(":", 2);
+            if (pair.length != 2) continue;
+            String[] ymd = pair[0].split("-");
+            String[] mins = pair[1].split(",");
+            if (ymd.length != 3 || mins.length != IDS.length || prayerIndex < 0 || prayerIndex >= mins.length) continue;
+            try {
+                int year = Integer.parseInt(ymd[0]);
+                int month = Integer.parseInt(ymd[1]);
+                int date = Integer.parseInt(ymd[2]);
+                int minute = Integer.parseInt(mins[prayerIndex]);
+                if (minute < 0 || minute >= 1440) continue;
+                Calendar c = Calendar.getInstance(tz);
+                c.clear();
+                c.setLenient(false);
+                c.set(year, month-1, date, minute/60, minute%60, 0);
+                long candidate = c.getTimeInMillis();
+                if (candidate > now && candidate < best) best = candidate;
+            } catch (Exception ignored) {}
+        }
+        return best == Long.MAX_VALUE ? -1L : best;
     }
 
     private static long nextOccurrence(long baseMillis, int minuteOfDay, TimeZone tz) {
