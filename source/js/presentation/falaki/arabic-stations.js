@@ -1,5 +1,6 @@
 /* QiblaAstro — Arabic lunar stations + traditional naw' calendar (presentation only).
- * Lunar station boundaries are derived from Stellarium's Arabic Lunar Mansions sky-culture boundaries.
+ * Lunar station boundaries are derived from Stellarium's Arabic Lunar Mansions sky-culture boundaries (J2000).
+ * Moon coordinates use the same Meeus Ch.47 periodic model already used by the app, then are precessed to J2000.
  * Naw' dates follow the traditional 365-day seasonal calendar used in Arabian almanacs.
  * No Qibla, compass, GNSS, camera, WMM or verification calculation is performed here.
  * © 2026 محمد سيد جبر بحيرى — Mohamed SG Behairy. All Rights Reserved.
@@ -12,6 +13,7 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
 
+  var D2R=Math.PI/180,R2D=180/Math.PI,J2000=2451545.0;
   var LUNAR_NAMES=[
     'الشرطان','البطين','الثريا','الدبران','الهقعة','الهنعة','الذراع','النثرة',
     'الطرف','الجبهة','الزبرة','الصرفة','العواء','السماك','الغفر','الزبانا',
@@ -20,7 +22,7 @@
   ];
 
   /* Each item is the eastern/right boundary of the corresponding lunar station.
-     Coordinates are [right ascension hours, declination degrees]. */
+     Coordinates are [right ascension hours, declination degrees], J2000. */
   var BOUNDARIES=[
     [[2.761017333,5.52063],[2.552874,15.03832],[2.275842,26.39457]],
     [[3.579898,8.96721],[3.412425333,18.66599],[3.22448,28.32728]],
@@ -64,6 +66,7 @@
 
   function finite(n){return typeof n==='number'&&Number.isFinite(n);}
   function mod(n,m){return ((n%m)+m)%m;}
+  function julianDate(date){return date.getTime()/86400000+2440587.5;}
 
   function boundaryRaHours(points,dec){
     var p=points.slice().sort(function(a,b){return a[1]-b[1];});
@@ -93,6 +96,51 @@
     return null;
   }
 
+  /* Truncated Meeus Ch.47 lunar longitude/latitude model, matching the app's
+     existing astronomical position model. Result is mean equatorial of date. */
+  function moonEquatorialOfDate(date){
+    var jd=julianDate(date),T=(jd-J2000)/36525,n=function(x){return mod(x,360);};
+    var Lp=n(218.3164477+481267.88123421*T-.0015786*T*T);
+    var DD=n(297.8501921+445267.1114034*T-.0018819*T*T);
+    var M=n(357.5291092+35999.0502909*T-.0001536*T*T);
+    var Mp=n(134.9633964+477198.8675055*T+.0087414*T*T);
+    var F=n(93.2720950+483202.0175233*T-.0036539*T*T);
+    var Dr=DD*D2R,Mr=M*D2R,Mpr=Mp*D2R,Fr=F*D2R;
+    var sL=6.288774*Math.sin(Mpr)+1.274027*Math.sin(2*Dr-Mpr)+.658314*Math.sin(2*Dr)
+      +.213618*Math.sin(2*Mpr)-.185116*Math.sin(Mr)-.114332*Math.sin(2*Fr)
+      +.058793*Math.sin(2*Dr-2*Mpr)+.057066*Math.sin(2*Dr-Mr-Mpr)
+      +.053322*Math.sin(2*Dr+Mpr)+.045758*Math.sin(2*Dr-Mr)
+      -.040923*Math.sin(Mr-Mpr)-.034720*Math.sin(Dr)-.030383*Math.sin(Mr+Mpr);
+    var sB=5.128122*Math.sin(Fr)+.280602*Math.sin(Mpr+Fr)+.277693*Math.sin(Mpr-Fr)
+      +.173237*Math.sin(2*Dr-Fr)+.055413*Math.sin(2*Dr-Mpr+Fr)
+      +.046272*Math.sin(2*Dr-Mpr-Fr)+.032573*Math.sin(2*Dr+Fr)+.017198*Math.sin(2*Mpr+Fr);
+    var lam=(Lp+sL)*D2R,beta=sB*D2R,eps=(23.439291-.013004167*T)*D2R;
+    var ra=Math.atan2(Math.sin(lam)*Math.cos(eps)-Math.tan(beta)*Math.sin(eps),Math.cos(lam))*R2D;
+    var dec=Math.asin(Math.sin(beta)*Math.cos(eps)+Math.cos(beta)*Math.sin(eps)*Math.sin(lam))*R2D;
+    return {jd:jd,raDeg:mod(ra,360),decDeg:dec};
+  }
+
+  /* Stellarium boundary data are J2000. Convert the Moon's equatorial-of-date
+     coordinates back to J2000 before testing the station region. */
+  function precessToJ2000(raDeg,decDeg,fromJd){
+    var T=(fromJd-J2000)/36525,t=(J2000-fromJd)/36525;
+    var zeta=((2306.2181+1.39656*T-.000139*T*T)*t+(.30188-.000344*T)*t*t+.017998*t*t*t)/3600*D2R;
+    var z=((2306.2181+1.39656*T-.000139*T*T)*t+(1.09468+.000066*T)*t*t+.018203*t*t*t)/3600*D2R;
+    var theta=((2004.3109-.85330*T-.000217*T*T)*t-(.42665+.000217*T)*t*t-.041833*t*t*t)/3600*D2R;
+    var a=raDeg*D2R,d=decDeg*D2R;
+    var A=Math.cos(d)*Math.sin(a+zeta);
+    var B=Math.cos(theta)*Math.cos(d)*Math.cos(a+zeta)-Math.sin(theta)*Math.sin(d);
+    var C=Math.sin(theta)*Math.cos(d)*Math.cos(a+zeta)+Math.cos(theta)*Math.sin(d);
+    return {raDeg:mod((Math.atan2(A,B)+z)*R2D,360),decDeg:Math.asin(Math.max(-1,Math.min(1,C)))*R2D};
+  }
+
+  function currentLunarStation(date){
+    var d=date instanceof Date?date:new Date(date||Date.now());
+    if(Number.isNaN(d.getTime()))return null;
+    var ofDate=moonEquatorialOfDate(d),j2000=precessToJ2000(ofDate.raDeg,ofDate.decDeg,ofDate.jd);
+    return lunarStation(j2000.raDeg,j2000.decDeg);
+  }
+
   function currentNaw(date){
     var d=date instanceof Date?date:new Date(date||Date.now());
     if(Number.isNaN(d.getTime()))return null;
@@ -105,8 +153,9 @@
   }
 
   return Object.freeze({
-    version:'1.0.0',
+    version:'1.1.0',
     lunarStation:lunarStation,
+    currentLunarStation:currentLunarStation,
     currentNaw:currentNaw,
     lunarNames:Object.freeze(LUNAR_NAMES.slice())
   });
