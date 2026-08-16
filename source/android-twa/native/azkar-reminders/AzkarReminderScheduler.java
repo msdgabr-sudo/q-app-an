@@ -13,11 +13,12 @@ public final class AzkarReminderScheduler {
     static final String KEY_PHRASE = "phrase_id";
     static final String KEY_TEXT = "phrase_text";
     static final int REQUEST_CODE = 7124;
+    static final int MIN_INTERVAL_MINUTES = 5;
 
     private AzkarReminderScheduler() {}
 
     public static void start(Context context, int intervalMinutes, String phraseId, String text) {
-        int minutes = Math.max(10, intervalMinutes);
+        int minutes = Math.max(MIN_INTERVAL_MINUTES, intervalMinutes);
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putBoolean(KEY_ENABLED, true)
                 .putInt(KEY_INTERVAL, minutes)
@@ -40,7 +41,7 @@ public final class AzkarReminderScheduler {
     }
 
     public static int intervalMinutes(Context context) {
-        return Math.max(10, context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_INTERVAL, 10));
+        return Math.max(MIN_INTERVAL_MINUTES, context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_INTERVAL, 10));
     }
 
     public static String phraseId(Context context) {
@@ -55,7 +56,7 @@ public final class AzkarReminderScheduler {
         if (!isEnabled(context)) return;
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager == null) return;
-        long trigger = SystemClock.elapsedRealtime() + Math.max(10, intervalMinutes) * 60_000L;
+        long trigger = SystemClock.elapsedRealtime() + Math.max(MIN_INTERVAL_MINUTES, intervalMinutes) * 60_000L;
         alarmManager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger, pendingIntent(context));
     }
 
