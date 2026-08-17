@@ -35,10 +35,17 @@ apply=need(Path('android-twa/apply_native_azkar_reminders.ps1'),'check_native_az
 for forbidden in ['apply_native_permissions.ps1','apply_native_widget.ps1','check_native_permissions_bridge.py','check_native_widget.py']:
     if forbidden in apply: errors.append(f"release orchestrator must not inject disabled exported bridge: {forbidden}")
 
-azkar=need(Path('android-twa/native/azkar-reminders/AzkarReminderActivity.java'),'AlertDialog.Builder','Azkar native bridge')
-for required in ['isExpectedBridgeUri','MAX_INTERVAL_MINUTES','safePhraseText']:
+azkar=need(Path('android-twa/native/azkar-reminders/AzkarReminderActivity.java'),'NativeBridgeToken.valid','Azkar native bridge')
+for required in ['isExpectedBridgeUri','MAX_INTERVAL_MINUTES','safePhraseText','requestPermissionThenStart','AzkarReminderScheduler.stop(this)']:
     if required not in azkar: errors.append(f"Azkar bridge hardening missing: {required}")
 if 'getQueryParameter("text")' in azkar: errors.append('Azkar bridge must not trust arbitrary incoming display text')
+
+azweb=need(Path('js/azkar-native-reminders.js'),'intent://azkar-reminder?','Azkar web/native bridge')
+for required in ["a.target='_top'",'a.click()','category=android.intent.category.BROWSABLE','tokenFromStorage']:
+    if required not in azweb: errors.append(f"Azkar web bridge missing browser-launch contract: {required}")
+azhost=need(Path('js/presentation/azkar/host.js'),"TOKEN_KEY='qiblaastro:native-token'",'Azkar iframe host')
+for required in ["'?twa=1'","'#nativeToken='+encodeURIComponent(token)",'seedFrameContext(frame)']:
+    if required not in azhost: errors.append(f"Azkar iframe native context propagation missing: {required}")
 
 for dangerous in [
     Path('js/presentation/widget-sync.js'),
@@ -54,4 +61,5 @@ if errors:
     print(f'FAILED: {len(errors)} integration issue(s)',file=sys.stderr)
     raise SystemExit(1)
 print('PASS: TWA identity, city label, permissions onboarding, service-worker cache and native Azkar orchestration are consistent')
+print('PASS: Azkar iframe propagates authenticated TWA context and launches the existing native component from a user gesture')
 print('PASS: exported widget-data and standalone notification-permission custom-scheme bridges are absent')
