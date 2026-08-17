@@ -1,7 +1,7 @@
-/* QiblaAstro Service Worker v6.14 — native Azkar toggle + prayer background plan + Quran/Azkar Back bridges
+/* QiblaAstro Service Worker v6.15 — Azkar TWA native bridge refresh + prayer background plan + Quran/Azkar Back bridges
  * © 2026 Mohamed SG Behairy. All Rights Reserved. */
 'use strict';
-const VERSION='qiblaastro-v6.14-native-azkar-toggle';
+const VERSION='qiblaastro-v6.15-azkar-native-bridge';
 const CACHE_PREFIX='qiblaastro-';
 const APP_CACHE=VERSION+'-app';
 const RUNTIME_CACHE=VERSION+'-runtime';
