@@ -40,9 +40,10 @@ for required in ['isExpectedBridgeUri','MAX_INTERVAL_MINUTES','safePhraseText','
     if required not in azkar: errors.append(f"Azkar bridge hardening missing: {required}")
 if 'getQueryParameter("text")' in azkar: errors.append('Azkar bridge must not trust arbitrary incoming display text')
 
-azweb=need(Path('js/azkar-native-reminders.js'),'intent://azkar-reminder?','Azkar web/native bridge')
-for required in ["a.target='_top'",'a.click()','category=android.intent.category.BROWSABLE','tokenFromStorage']:
+azweb=need(Path('js/azkar-native-reminders.js'),'qiblaastro://azkar-reminder?','Azkar web/native bridge')
+for required in ['topWin.location.href=uri','intent://azkar-reminder?','category=android.intent.category.BROWSABLE','tokenFromStorage']:
     if required not in azweb: errors.append(f"Azkar web bridge missing browser-launch contract: {required}")
+if 'a.click()' in azweb: errors.append('Azkar web bridge must not rely on a synthetic anchor click for native launch')
 azhost=need(Path('js/presentation/azkar/host.js'),"TOKEN_KEY='qiblaastro:native-token'",'Azkar iframe host')
 for required in ["'?twa=1'","'#nativeToken='+encodeURIComponent(token)",'seedFrameContext(frame)']:
     if required not in azhost: errors.append(f"Azkar iframe native context propagation missing: {required}")
@@ -61,5 +62,5 @@ if errors:
     print(f'FAILED: {len(errors)} integration issue(s)',file=sys.stderr)
     raise SystemExit(1)
 print('PASS: TWA identity, city label, permissions onboarding, service-worker cache and native Azkar orchestration are consistent')
-print('PASS: Azkar iframe propagates authenticated TWA context and launches the existing native component from a user gesture')
+print('PASS: Azkar iframe propagates authenticated TWA context and uses direct custom-scheme navigation from the user gesture')
 print('PASS: exported widget-data and standalone notification-permission custom-scheme bridges are absent')
