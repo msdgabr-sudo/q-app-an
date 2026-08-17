@@ -19,7 +19,7 @@ for key,value in [('packageId','com.qiblalabs'),('host','app.qiblalabs.com'),('s
     if manifest.get(key)!=value: errors.append(f"TWA {key} mismatch: {manifest.get(key)!r}")
 
 sw=need(Path('service-worker.js'),'js/presentation/permissions-onboarding.js','service worker')
-for token in ['js/presentation/location-label.js','js/azkar-native-reminders.js']:
+for token in ['js/presentation/location-label.js','js/azkar-native-reminders.js','js/presentation/prayer/schedule-sync.js']:
     if token not in sw: errors.append(f"service worker critical cache missing: {token}")
 if 'widget-sync.js' in sw: errors.append('disabled widget deep-link sync must not be in the critical cache')
 
@@ -48,6 +48,12 @@ azhost=need(Path('js/presentation/azkar/host.js'),"TOKEN_KEY='qiblaastro:native-
 for required in ["'?twa=1'","'#nativeToken='+encodeURIComponent(token)",'seedFrameContext(frame)']:
     if required not in azhost: errors.append(f"Azkar iframe native context propagation missing: {required}")
 
+prayerweb=need(Path('js/presentation/prayer/schedule-sync.js'),'qiblaastro://prayer-sync?','Prayer web/native bridge')
+for required in ["reason==='explicit'",'topWin.location.href=uri','intent://prayer-sync?','category=android.intent.category.BROWSABLE',"closest('#qa-adhan-card"]:
+    if required not in prayerweb: errors.append(f"Prayer web bridge missing user-gesture handoff contract: {required}")
+if "setTimeout(function(){try{explicitSync()" in prayerweb:
+    errors.append('Prayer explicit native sync must stay synchronous inside the trusted user click')
+
 for dangerous in [
     Path('js/presentation/widget-sync.js'),
     Path('android-twa/native/widget/WidgetDataActivity.java'),
@@ -61,6 +67,7 @@ if errors:
     for e in errors: print('ERROR:',e,file=sys.stderr)
     print(f'FAILED: {len(errors)} integration issue(s)',file=sys.stderr)
     raise SystemExit(1)
-print('PASS: TWA identity, city label, permissions onboarding, service-worker cache and native Azkar orchestration are consistent')
+print('PASS: TWA identity, city label, permissions onboarding and service-worker cache are consistent')
 print('PASS: Azkar iframe propagates authenticated TWA context and uses direct custom-scheme navigation from the user gesture')
+print('PASS: Prayer UI synchronously hands the authenticated dated schedule to the published native prayer component from a user gesture')
 print('PASS: exported widget-data and standalone notification-permission custom-scheme bridges are absent')
