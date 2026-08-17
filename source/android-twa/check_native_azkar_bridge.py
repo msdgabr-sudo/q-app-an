@@ -19,7 +19,7 @@ def fail(message: str) -> None: errors.append(message)
 required_java = {"AzkarReminderScheduler.java","AzkarReminderReceiver.java","AzkarReminderActivity.java","AzkarBootReceiver.java"}
 required_raw = {"azkar_subhanallah.mp3","azkar_alhamdulillah.mp3","azkar_allahuakbar.mp3","azkar_lailahaillallah.mp3","azkar_astaghfirullah.mp3","azkar_astaghfirullahalazim.mp3","azkar_subhanallahwabihamdih.mp3","azkar_lahawla.mp3","azkar_hasbiyallah.mp3","azkar_salat.mp3"}
 required_sets = ("values","values-en","values-fr","values-id","values-ur")
-required_strings = {"azkar_channel_name","azkar_channel_description","azkar_notification_title","azkar_start_title","azkar_start_message","azkar_start_action","azkar_stop_title","azkar_stop_message","azkar_stop_action","azkar_cancel_action","azkar_permission_required","azkar_started_toast"}
+required_strings = {"azkar_channel_name","azkar_channel_description","azkar_notification_title","azkar_permission_required","azkar_started_toast"}
 
 if not MANIFEST.is_file(): fail(f"generated manifest missing: {MANIFEST}")
 else:
@@ -62,14 +62,17 @@ for set_name in required_sets:
 scheduler=JAVA/"AzkarReminderScheduler.java"
 if scheduler.is_file():
     text=scheduler.read_text(encoding="utf-8")
+    if "MIN_INTERVAL_MINUTES = 5" not in text: fail("scheduler must honor the visible five-minute interval")
     if "setAndAllowWhileIdle" not in text: fail("scheduler must use setAndAllowWhileIdle")
     if "setExact" in text or "setExactAndAllowWhileIdle" in text: fail("scheduler must not use exact alarms")
+    if "PendingIntent.getBroadcast" not in text or "AzkarReminderReceiver.class" not in text: fail("background reminder must target a broadcast receiver independent of the TWA UI")
 
 activity=JAVA/"AzkarReminderActivity.java"
 if activity.is_file():
     text=activity.read_text(encoding="utf-8")
-    for required in ("POST_NOTIFICATIONS","requestPermissions","AlertDialog.Builder","isExpectedBridgeUri",'"qiblaastro".equals(data.getScheme())','"azkar-reminder".equals(data.getHost())',"R.string.azkar_start_title","R.string.azkar_permission_required"):
+    for required in ("POST_NOTIFICATIONS","requestPermissions","requestPermissionThenStart","AzkarReminderScheduler.start","AzkarReminderScheduler.stop","isExpectedBridgeUri",'"qiblaastro".equals(data.getScheme())','"azkar-reminder".equals(data.getHost())',"R.string.azkar_permission_required"):
         if required not in text: fail(f"activity contract missing: {required}")
+    if "AlertDialog.Builder" in text: fail("obsolete second confirmation dialog must not return; the visible toggle is the user action")
     if 'getQueryParameter("text")' in text: fail("activity must not trust arbitrary incoming display text")
 
 receiver=JAVA/"AzkarReminderReceiver.java"
@@ -89,4 +92,4 @@ if errors:
     for error in errors: print("ERROR:",error,file=sys.stderr)
     raise SystemExit(1)
 print("PASS: AR/EN/FR/ID/UR resources generated and referenced by native notification UI")
-print("PASS: Android 13+ notification permission, channel, launch intent, reboot and inexact-alarm contracts intact")
+print("PASS: direct authenticated toggle, Android 13+ permission, broadcast scheduling, reboot and inexact-alarm contracts intact")
