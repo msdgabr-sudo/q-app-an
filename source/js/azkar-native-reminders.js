@@ -25,17 +25,16 @@ function isNativeTwa(){try{var here=new URLSearchParams(root.location.search||''
 function selectedInterval(){var b=root.document.querySelector('#azIntervals .az-interval.is-on');var n=b?parseInt(b.textContent,10):10;return Number.isFinite(n)?Math.max(5,n):10;}
 function selectedText(){var s=root.document.getElementById('azAudioPhrase');return s&&s.value?s.value:'سبحان الله';}
 function phraseId(text){return PHRASES[text]||'subhanallah';}
-function intentUri(mode,minutes,text,token){return 'intent://azkar-reminder?token='+encodeURIComponent(token)+'&mode='+encodeURIComponent(mode)+'&interval='+encodeURIComponent(String(minutes||10))+'&phrase='+encodeURIComponent(phraseId(text))+'#Intent;scheme=qiblaastro;package=com.qiblalabs;category=android.intent.category.BROWSABLE;end';}
+function customSchemeUri(mode,minutes,text,token){return 'qiblaastro://azkar-reminder?token='+encodeURIComponent(token)+'&mode='+encodeURIComponent(mode)+'&interval='+encodeURIComponent(String(minutes||10))+'&phrase='+encodeURIComponent(phraseId(text));}
+function intentFallbackUri(mode,minutes,text,token){return 'intent://azkar-reminder?token='+encodeURIComponent(token)+'&mode='+encodeURIComponent(mode)+'&interval='+encodeURIComponent(String(minutes||10))+'&phrase='+encodeURIComponent(phraseId(text))+'#Intent;scheme=qiblaastro;package=com.qiblalabs;category=android.intent.category.BROWSABLE;end';}
+function navigateTop(uri){try{var topWin=root.top||root;topWin.location.href=uri;return true;}catch(_){try{root.location.href=uri;return true;}catch(__){return false;}}}
 function launch(mode,minutes,text){
   var token=captureToken();if(!token)return false;
-  var uri=intentUri(mode,minutes,text,token);
-  try{
-    var doc=root.document,a=doc.createElement('a');
-    a.href=uri;a.target='_top';a.rel='noopener';a.setAttribute('aria-hidden','true');a.style.display='none';
-    (doc.body||doc.documentElement).appendChild(a);a.click();a.remove();return true;
-  }catch(_){
-    try{(root.top||root).location.href=uri;return true;}catch(__){try{root.location.href=uri;return true;}catch(___){return false;}}
-  }
+  /* Keep the native handoff synchronous inside the trusted click. The installed
+     Activity already declares qiblaastro://azkar-reminder as BROWSABLE. */
+  var direct=customSchemeUri(mode,minutes,text,token);
+  if(navigateTop(direct))return true;
+  return navigateTop(intentFallbackUri(mode,minutes,text,token));
 }
 function readState(){try{return JSON.parse(root.localStorage.getItem(STORAGE_KEY)||'null');}catch(_){return null;}}
 function writeState(value){try{if(value)root.localStorage.setItem(STORAGE_KEY,JSON.stringify(value));else root.localStorage.removeItem(STORAGE_KEY);}catch(_){}}
