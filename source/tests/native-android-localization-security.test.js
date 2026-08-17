@@ -69,6 +69,7 @@ assert(webSync.includes("maybeAutoSync('runtime-ready')"),'native plan must refr
 assert(webSync.includes('if(minute<0)return null'),'native prayer sync must fail closed until all five prayer times exist');
 const azWeb=read('js/azkar-native-reminders.js');
 const azPage=read('pages/azkar.html');
+const azHost=read('js/presentation/azkar/host.js');
 assert(azWeb.includes("token='+encodeURIComponent(token)"),'Azkar web bridge must send authenticated token');
 assert(azWeb.includes('tokenFromHash'),'Azkar bridge must read token from fragment');
 assert(azWeb.includes('tokenFromStorage'),'Azkar bridge must recover the authenticated token from the same-origin TWA session');
@@ -76,13 +77,18 @@ assert(azWeb.includes('Math.max(5,n)'),'Azkar web bridge must honor the visible 
 assert(azWeb.includes("var launched=launch('start'"),'Azkar UI must inspect native launch result before persisting running state');
 assert(azWeb.includes('if(!launched){clearStaleState();return;}'),'Azkar UI must fail closed without showing a false Android error note');
 assert(azWeb.indexOf("var launched=launch('start'")<azWeb.indexOf('writeState(state);setUi(true,state);'),'Azkar UI must not claim a running native reminder before attempting Android launch');
+assert(azWeb.includes("a.target='_top'")&&azWeb.includes('a.click()'),'Azkar native intent must be launched synchronously from the user gesture through a top-targeted anchor');
+assert(azWeb.includes('category=android.intent.category.BROWSABLE'),'Azkar native intent must explicitly remain browser-invokable');
 assert(!azWeb.includes('تعذر بدء تنبيه Android')&&!azWeb.includes('افتح التطبيق من نسخة Android'),'obsolete visible Android failure note must remain removed');
+assert(azHost.includes("TOKEN_KEY='qiblaastro:native-token'")&&azHost.includes("'?twa=1'")&&azHost.includes("'#nativeToken='+encodeURIComponent(token)"),'Azkar iframe host must propagate authenticated TWA context into the standalone page');
+assert(azHost.includes('seedFrameContext(frame)'),'Azkar iframe must receive same-origin session TWA/token context after load');
 assert(azPage.includes('#azAudio .az-audio-status{display:none!important}'),'Azkar audio status note must remain hidden; the toggle is the visible state control');
-assert(azPage.includes('azkar-native-reminders.js?v=20260817-native2'),'Azkar page must load the refreshed native reminder bridge');
+assert(azPage.includes('azkar-native-reminders.js?v=20260817-native3'),'Azkar page must load the latest published-native-compatible reminder bridge');
 const bootstrap=read('js/presentation/bootstrap.js');
 assert(bootstrap.includes('schedule-sync.js?v=20260814-nativebridge1'),'authenticated prayer sync loader version missing');
 const sw=read('service-worker.js');
 assert(/qiblaastro-v\d+\.\d+-/.test(sw),'versioned service-worker cache missing');
+assert(sw.includes('qiblaastro-v6.15-azkar-native-bridge'),'latest Azkar native bridge service-worker version missing');
 assert(sw.includes('./js/presentation/prayer/native-plan.js')&&sw.includes('./js/presentation/prayer/schedule-sync.js')&&sw.includes('./js/azkar-native-reminders.js'),'native web bridge files must remain in critical offline cache');
 console.log('Native Android localization/security gate: PASS');
 console.log('Prayer actual-time + separate pre-alert + local Adhan audio: PASS');
@@ -90,6 +96,7 @@ console.log('Prayer CLOSED-APP native chain (RTC_WAKEUP -> BroadcastReceiver -> 
 console.log('Prayer reboot/app-replacement/time-change schedule restoration: PASS');
 console.log('Prayer native sync refreshes only after explicit/persisted activation and fails closed before a complete schedule: PASS');
 console.log('Prayer native bridge carries a validated 14-day date-stamped schedule and never replays an exhausted plan: PASS');
+console.log('Azkar published-native-compatible iframe token propagation + user-gesture intent launch: PASS');
 console.log('Azkar native toggle + five-minute local background scheduling: PASS');
 console.log('Prayer notifications AR/EN/FR/ID/UR: PASS');
 console.log('Widget AR/EN/FR/ID/UR: PASS');
