@@ -14,6 +14,7 @@ assert(activity.includes('AzkarReminderScheduler.stop(this)'),'Azkar native stop
 assert(activity.includes('requestPermissionThenStart();'),'Azkar native start action must proceed directly from the authenticated toggle');
 assert(azScheduler.includes('MIN_INTERVAL_MINUTES = 5'),'Azkar scheduler must honor five-minute reminders');
 assert(azScheduler.includes('setAndAllowWhileIdle'),'Azkar reminders must remain locally scheduled while the app UI is closed');
+assert(azScheduler.includes('PendingIntent.getBroadcast')&&azScheduler.includes('AzkarReminderReceiver.class'),'Azkar reminder must be delivered by BroadcastReceiver without an open TWA page');
 const prayerRequired=['prayer_channel_adhan','prayer_channel_notice','prayer_channel_description','prayer_notification_title','prayer_notification_now','prayer_notification_advance','prayer_name_fajr','prayer_name_dhuhr','prayer_name_asr','prayer_name_maghrib','prayer_name_isha'];
 const widgetRequired=['widget_app_name','widget_city_unavailable','widget_refresh_required','widget_value_unavailable','widget_qibla_unavailable','widget_qibla_value'];
 for(const set of sets){let p=`android-twa/native/prayer-widget/res/${set}/strings.xml`;assert(fs.existsSync(p),`${p} missing`);let n=stringNames(read(p));for(const k of prayerRequired)assert(n.has(k),`${set} missing ${k}`);p=`android-twa/native/widget/res/${set}/strings.xml`;n=stringNames(read(p));for(const k of widgetRequired)assert(n.has(k),`${set} missing ${k}`);}
@@ -22,6 +23,7 @@ const launcher=read('android-twa/native/prayer-widget/QiblaLauncherActivity.java
 const sync=read('android-twa/native/prayer-widget/PrayerWidgetSyncActivity.java');
 const scheduler=read('android-twa/native/prayer-widget/PrayerNativeScheduler.java');
 const receiver=read('android-twa/native/prayer-widget/PrayerNotificationReceiver.java');
+const prayerBoot=read('android-twa/native/prayer-widget/PrayerBootReceiver.java');
 const widget=read('android-twa/native/widget/QiblaWidgetProvider.java');
 const apply=read('android-twa/apply_native_widget.ps1');
 for(const t of ['SecureRandom','MODE_PRIVATE','candidate'])assert(token.includes(t),`token gate missing ${t}`);
@@ -32,10 +34,16 @@ assert(sync.includes('MODE_PRIVATE'),'sync data must use app-private storage');
 assert(sync.includes('safePlan(d.getQueryParameter("plan"))'),'native prayer bridge must validate the date-stamped plan before storing it');
 assert(sync.includes('days.length<2||days.length>14'),'native prayer bridge must bound the background plan horizon');
 assert(scheduler.includes('setAndAllowWhileIdle'),'prayer scheduling must remain local and not require external push service');
+assert(scheduler.includes('AlarmManager.RTC_WAKEUP'),'prayer alarm must be able to wake delivery while the app UI is closed');
+assert(scheduler.includes('PendingIntent.getBroadcast')&&scheduler.includes('PrayerNotificationReceiver.class'),'prayer alarm must target a BroadcastReceiver rather than an open Activity/page');
 assert(scheduler.includes('PRE_REQ')&&scheduler.includes('boolean pre'),'pre-prayer alert must be separate from prayer-time event');
 assert(scheduler.includes('KEY_PLAN = "plan_v1"'),'date-stamped native prayer plan store is missing');
 assert(scheduler.includes('nextPlannedOccurrence(plan, i, now, tz)'),'native scheduler must select the next dated prayer instead of repeating stale daily minutes');
 assert(scheduler.includes('if (actual <= 0L) continue;'),'an exhausted date-stamped plan must fail closed instead of replaying stale times');
+assert(receiver.includes('extends BroadcastReceiver'),'prayer delivery must remain an Android BroadcastReceiver independent of the TWA lifecycle');
+assert(receiver.includes('show(context,id,mode,pre);')&&receiver.includes('PrayerNativeScheduler.reschedule(context);'),'receiver must emit the notification/adhan and then schedule the next dated event');
+assert(prayerBoot.includes('ACTION_BOOT_COMPLETED')&&prayerBoot.includes('ACTION_MY_PACKAGE_REPLACED')&&prayerBoot.includes('ACTION_TIMEZONE_CHANGED')&&prayerBoot.includes('ACTION_TIME_CHANGED'),'prayer alarms must be restored after reboot/app replacement/time changes');
+assert(prayerBoot.includes('PrayerNativeScheduler.reschedule(context)'),'boot/time receiver must restore the native prayer schedule');
 for(const raw of ['adhan_mecca.mp3','adhan_ahmed_al_nufais.mp3','adhan_islam_sobhi.mp3','adhan_fajr.mp3'])assert(apply.includes(raw),`native Adhan package missing ${raw}`);
 assert(receiver.includes('USAGE_ALARM')&&receiver.includes('rawForAdhan'),'selected local Adhan audio must play only through native prayer alarm channel');
 assert(widget.includes('PrayerNativeScheduler.PREFS'),'widget must read authenticated app-private prayer store');
@@ -78,6 +86,8 @@ assert(/qiblaastro-v\d+\.\d+-/.test(sw),'versioned service-worker cache missing'
 assert(sw.includes('./js/presentation/prayer/native-plan.js')&&sw.includes('./js/presentation/prayer/schedule-sync.js')&&sw.includes('./js/azkar-native-reminders.js'),'native web bridge files must remain in critical offline cache');
 console.log('Native Android localization/security gate: PASS');
 console.log('Prayer actual-time + separate pre-alert + local Adhan audio: PASS');
+console.log('Prayer CLOSED-APP native chain (RTC_WAKEUP -> BroadcastReceiver -> local alarm sound -> reschedule): PASS');
+console.log('Prayer reboot/app-replacement/time-change schedule restoration: PASS');
 console.log('Prayer native sync refreshes only after explicit/persisted activation and fails closed before a complete schedule: PASS');
 console.log('Prayer native bridge carries a validated 14-day date-stamped schedule and never replays an exhausted plan: PASS');
 console.log('Azkar native toggle + five-minute local background scheduling: PASS');
