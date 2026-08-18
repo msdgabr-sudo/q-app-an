@@ -3,9 +3,8 @@ name: Verify main release source and build unsigned AAB
 # SINGLE-BRANCH RELEASE GATE
 # --------------------------
 # `main` is the authoritative source for both the deployed web application and
-# future Android release builds. source/.release-source-sha records historical
-# provenance only; it does NOT authorize replacing current main/source with the
-# older Mizan baseline.
+# Android release builds. This workflow proves that the generated release AAB
+# contains the native first-run Adhan/notification path, not only the web code.
 
 on:
   push:
@@ -23,6 +22,8 @@ permissions:
 env:
   SOURCE_SHA: 6e49775df5742413371a4165ea985173c43f5f5e
   BUBBLEWRAP_IMAGE: ghcr.io/googlechromelabs/bubblewrap@sha256:01b3d5cdcdb670edd8ee00654c36f978896da78dfd7cc7e62814b83268c6f53b
+  RELEASE_VERSION: 3.1.1
+  RELEASE_CODE: '4'
 
 jobs:
   verify-and-build:
@@ -89,7 +90,7 @@ jobs:
           python3 source/android-twa/check_release_integration.py
           (cd source && node tests/native-android-localization-security.test.js)
 
-      - name: Build unsigned release AAB
+      - name: Build unsigned release AAB and inspect merged native contract
         run: |
           set -euo pipefail
           docker run --rm --entrypoint bash -v "$PWD/source/android-twa:/app" -w /app "$BUBBLEWRAP_IMAGE" -lc '
@@ -120,16 +121,17 @@ jobs:
           done
           test -n "$CANDIDATE"
           mkdir -p dist
-          cp "$CANDIDATE" dist/QiblaAstro-3.1.0-code3-unsigned.aab
-          unzip -t dist/QiblaAstro-3.1.0-code3-unsigned.aab >/dev/null
-          sha256sum dist/QiblaAstro-3.1.0-code3-unsigned.aab | tee dist/QiblaAstro-3.1.0-code3-unsigned.aab.sha256
+          OUT="dist/QiblaAstro-${RELEASE_VERSION}-code${RELEASE_CODE}-unsigned.aab"
+          cp "$CANDIDATE" "$OUT"
+          unzip -t "$OUT" >/dev/null
+          sha256sum "$OUT" | tee "${OUT}.sha256"
 
       - name: Upload unsigned AAB proof artifact
         uses: actions/upload-artifact@v6
         with:
-          name: QiblaAstro-3.1.0-code3-unsigned-AAB-proof
+          name: QiblaAstro-3.1.1-code4-native-Adhan-AAB-proof
           path: |
-            dist/QiblaAstro-3.1.0-code3-unsigned.aab
-            dist/QiblaAstro-3.1.0-code3-unsigned.aab.sha256
+            dist/QiblaAstro-3.1.1-code4-unsigned.aab
+            dist/QiblaAstro-3.1.1-code4-unsigned.aab.sha256
           if-no-files-found: error
           retention-days: 14
