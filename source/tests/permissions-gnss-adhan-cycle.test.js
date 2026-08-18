@@ -72,7 +72,8 @@ assert(bootstrap.includes('permissions-onboarding.js?v=20260818-location-adhan3'
 assert(bootstrap.includes('schedule-sync.js?v=20260818-adhan-handoff1'),'Bootstrap must request the repaired Android handoff asset');
 assert(bootstrap.includes('adhan-ui.js?v=20260818-adhan-enable1'),'Bootstrap must request the Adhan master-enable API asset');
 assert(sw.includes("'./js/presentation/permissions-onboarding.js'"),'Permissions integration must stay in critical cache');
-assert(sw.includes("PERMISSIONS_RELEASE='location-adhan-cycle-20260818'"),'Service worker must advertise the current permissions cycle release');
+assert(sw.includes("PERMISSIONS_RELEASE='location-adhan-cycle-20260818-v2'"),'Service worker must advertise the repaired permissions cycle release');
+assert(sw.includes("VERSION='qiblaastro-v6.17-adhan-permission-handoff'"),'Service worker version must force installed clients onto the repaired Adhan handoff code');
 assert(!sw.includes("'./js/05-gnss.js'"),'Service worker must not activate the unused external GNSS implementation beside the production inline engine');
 
 // Behavioral regression: the onboarding path must enable Adhan, send notify=1 through
