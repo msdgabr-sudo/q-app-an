@@ -31,9 +31,10 @@ public final class PrayerNotificationReceiver extends BroadcastReceiver {
         boolean adhan=!pre&&"adhan".equals(mode);
         String profile=p.getString("profile","makkah");
         String soundKey="fajr".equals(id)?"fajr":("calm".equals(profile)?"calm":"deep".equals(profile)?"deep":"makkah");
-        String channel=adhan?("qiblaastro_prayer_adhan_"+soundKey+"_v1"):"qiblaastro_prayer_notice_v1";
-        int rawId=adhan?rawForAdhan(c,soundKey):0;
-        Uri sound=rawId==0?null:Uri.parse("android.resource://"+c.getPackageName()+"/"+rawId);
+        String channel=adhan?("qiblaastro_prayer_adhan_"+soundKey+"_v2"):"qiblaastro_prayer_notice_v2";
+        String rawName=adhan?rawNameForAdhan(soundKey):"";
+        int rawId=rawName.isEmpty()?0:c.getResources().getIdentifier(rawName,"raw",c.getPackageName());
+        Uri sound=rawId==0?null:Uri.parse("android.resource://"+c.getPackageName()+"/raw/"+rawName);
         NotificationManager nm=(NotificationManager)c.getSystemService(Context.NOTIFICATION_SERVICE);
         if(nm==null)return;
         if(Build.VERSION.SDK_INT>=26){
@@ -56,9 +57,8 @@ public final class PrayerNotificationReceiver extends BroadcastReceiver {
         nm.notify((pre?8700:8600)+indexOf(id),b.build());
     }
 
-    private int rawForAdhan(Context c,String key){
-        String r="fajr".equals(key)?"adhan_fajr":"calm".equals(key)?"adhan_ahmed_al_nufais":"deep".equals(key)?"adhan_islam_sobhi":"adhan_mecca";
-        return c.getResources().getIdentifier(r,"raw",c.getPackageName());
+    private String rawNameForAdhan(String key){
+        return "fajr".equals(key)?"adhan_fajr":"calm".equals(key)?"adhan_ahmed_al_nufais":"deep".equals(key)?"adhan_islam_sobhi":"adhan_mecca";
     }
 
     public static String prayerName(Context c,String id){
