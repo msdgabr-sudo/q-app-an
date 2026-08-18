@@ -12,6 +12,9 @@ const apply=read('android-twa/apply_native_widget.ps1');
 for(const token of ['MODE_COMPACT','MODE_MEDIUM','MODE_LARGE','onAppWidgetOptionsChanged','OPTION_APPWIDGET_MIN_WIDTH','OPTION_APPWIDGET_MIN_HEIGHT','R.layout.qibla_widget_compact','R.layout.qibla_widget_large']){
   assert(provider.includes(token),`responsive widget provider missing ${token}`);
 }
+for(const token of ['Build.VERSION_CODES.S','Map<SizeF, RemoteViews>','new SizeF(110f, 110f)','new SizeF(245f, 110f)','new SizeF(245f, 180f)','new RemoteViews(viewMapping)']){
+  assert(provider.includes(token),`Android 12 responsive RemoteViews contract missing ${token}`);
+}
 for(const forbidden of ['calcQibla','WMM2025','sunPos(','moonPos(','solarEvts(','navigator.geolocation','bigdatacloud','LAT','LON']){
   assert(!provider.includes(forbidden),`widget provider must remain presentation-only: ${forbidden}`);
 }
@@ -48,5 +51,5 @@ for(const drawable of ['qibla_widget_bg.xml','qibla_widget_panel.xml','qibla_wid
 }
 
 console.log('Premium responsive widget: PASS');
-console.log('2x2 compact + 4x2 medium + 4x3 large presentation buckets: PASS');
+console.log('2x2 compact + 4x2 medium + 4x3 large responsive RemoteViews buckets: PASS');
 console.log('Scope guard: widget remains read-only; Qibla/prayer/astronomy/location calculations untouched: PASS');
