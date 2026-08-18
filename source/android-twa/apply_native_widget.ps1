@@ -34,6 +34,9 @@ if(-not $text.Contains($marker)){$components=@"
         <activity android:name="com.qiblalabs.nativebridge.PrayerWidgetSyncActivity" android:exported="true" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="qiblaastro" android:host="prayer-sync" /></intent-filter>
         </activity>
+        <activity android:name="com.qiblalabs.nativebridge.LocationSettingsActivity" android:exported="true" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="qiblaastro" android:host="location-settings" /></intent-filter>
+        </activity>
         <receiver android:name="com.qiblalabs.nativebridge.PrayerNotificationReceiver" android:exported="false" />
         <receiver android:name="com.qiblalabs.nativebridge.PrayerBootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.intent.action.TIMEZONE_CHANGED" /><action android:name="android.intent.action.TIME_SET" /><action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" /></intent-filter></receiver>
         <receiver android:name="com.qiblalabs.widget.QiblaWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/qibla_widget_info" /></receiver>
@@ -60,13 +63,18 @@ $text=Get-Content -LiteralPath $Manifest -Raw
 
 if($text -match 'android:name=["''](?:com\.qiblalabs\.)?WidgetDataActivity["'']'){throw 'Legacy exported WidgetDataActivity must not return.'}
 if($text -notmatch 'QiblaLauncherActivity'){throw 'Authenticated launcher replacement failed.'}
+if($text -notmatch 'LocationSettingsActivity'){throw 'Authenticated Location settings activity injection failed.'}
 if($text -notmatch 'android.permission.SCHEDULE_EXACT_ALARM'){throw 'Exact prayer alarm permission injection failed.'}
 $sync=Get-Content -LiteralPath (Join-Path $JavaBridge 'PrayerWidgetSyncActivity.java') -Raw
 $scheduler=Get-Content -LiteralPath (Join-Path $JavaBridge 'PrayerNativeScheduler.java') -Raw
 $token=Get-Content -LiteralPath (Join-Path $JavaBridge 'NativeBridgeToken.java') -Raw
+$location=Get-Content -LiteralPath (Join-Path $JavaBridge 'LocationSettingsActivity.java') -Raw
+$locationState=Get-Content -LiteralPath (Join-Path $JavaBridge 'NativeLocationState.java') -Raw
 if($sync -notmatch 'NativeBridgeToken\.valid'){throw 'Prayer/widget sync token validation missing.'}
 if($sync -notmatch 'ACTION_REQUEST_SCHEDULE_EXACT_ALARM'){throw 'Contextual exact-alarm settings request missing.'}
 if($scheduler -notmatch 'setExactAndAllowWhileIdle'){throw 'Prayer-time exact alarm scheduler missing.'}
 if($token -notmatch 'SecureRandom' -or $token -notmatch 'MODE_PRIVATE'){throw 'Per-install cryptographic private token store missing.'}
 if($sync -notmatch 'MODE_PRIVATE'){throw 'Private native prayer/widget store requirement missing.'}
-Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
+if($location -notmatch 'NativeBridgeToken\.valid' -or $location -notmatch 'ACTION_LOCATION_SOURCE_SETTINGS'){throw 'Authenticated Android Location settings bridge missing.'}
+if($locationState -notmatch 'isLocationEnabled' -or $locationState -notmatch 'GPS_PROVIDER'){throw 'Android Location service-state reader missing.'}
+Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + Location settings + translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
