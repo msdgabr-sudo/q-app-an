@@ -125,7 +125,8 @@ assert(webSync.includes("q.set('interactive',interactive?'1':'0')"));
 assert(webSync.includes("q.set('onboarding',onboarding?'1':'0')"));
 assert(webSync.includes('intent://prayer-sync?')&&webSync.includes('package=com.qiblalabs'));
 assert(webSync.includes("maybeAutoSync('startup')")&&webSync.includes("maybeAutoSync('location-changed')")&&webSync.includes("maybeAutoSync('runtime-ready')"));
-assert(webSync.includes('if(minute<0)return null'));
+assert(webSync.includes('if(!p||!Number.isFinite(Number(p.h)))return -1;'),'invalid/missing prayer time must be rejected by minuteFor');
+assert(webSync.includes("if(minute<0)return {ready:false,reason:'prayer-times'}"),'invalid prayer minute must stop Native payload readiness');
 
 // Azkar bridge: Android is the source of truth; visible UI never claims success before launcher confirmation.
 const azWeb=read('js/azkar-native-reminders.js');
