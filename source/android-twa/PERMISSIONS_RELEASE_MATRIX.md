@@ -1,118 +1,86 @@
 # QiblaAstro ELITE — Android Permission & Capability Release Matrix
 
-**Branch:** `pre`  
-**Package:** `com.qiblalabs.qiblaastro`  
+**Release source:** `main/source`  
+**Package:** `com.qiblalabs`  
 **Origin:** `https://app.qiblalabs.com`  
+**Release:** `3.1.1` / `versionCode 4`  
 **Target:** Android 16 / API 36
 
 This document is a release boundary. A permission must not be added merely "just in case". Each permission/capability must have a current user-facing feature, a runtime flow, a privacy disclosure where applicable, and a physical-device acceptance test.
 
-## Gate A — First TWA build: approved now
-
-### Precise / approximate location
-- Web feature: GNSS Qibla, prayer calculations, astronomical verification inputs.
+## Location
+- Feature: trusted GNSS for Qibla, prayer calculations and astronomical verification inputs.
 - TWA config: `features.locationDelegation.enabled = true`.
-- Expected Android wrapper permissions after Bubblewrap generation:
+- Required wrapper permissions after Bubblewrap generation:
   - `android.permission.ACCESS_COARSE_LOCATION`
   - `android.permission.ACCESS_FINE_LOCATION`
-- Runtime behavior: Android permission dialog; user may grant approximate or precise location.
-- Privacy rule: precise coordinates remain functional data and must not be sent by our GA4 event layer.
-- Acceptance: fresh install -> location request -> GNSS succeeds; denial produces controlled UI; granting later restores function.
+- Runtime rule: location permission and acquisition of a trusted high-accuracy GNSS fix are separate states.
+- Privacy rule: precise coordinates remain functional data and must not be sent by analytics.
 
-### Notifications
-- Feature: notification delegation now; future prayer/azkar alerts rely on Android notification capability.
+## Notifications
+- Feature: native prayer/Adhan delivery and Azkar reminders.
 - TWA config: `enableNotifications = true`.
-- Required on Android 13+ / target API 36:
+- Required on Android 13+:
   - `android.permission.POST_NOTIFICATIONS`
-- Runtime behavior: request in context, after explaining why reminders need it; do not surprise-request unrelated permissions at first paint.
-- Acceptance: fresh install with permission reset -> Allow/Don't allow paths tested separately.
+- Runtime rule: request contextually from an explicit user action. An enabled Adhan plan is not persisted/scheduled until the notification permission is granted.
 
-### Camera
-- Feature: sun/moon astronomical observation.
-- Current architecture: camera is requested by the web application through the trusted browser/TWA site permission flow.
-- Release rule: do **not** add `android.permission.CAMERA` to the wrapper merely for symmetry unless the generated/native architecture demonstrably requires it.
-- Acceptance: open astronomical verification -> site/TWA camera permission -> live camera opens; denial remains recoverable via site settings.
+## Exact prayer-time Adhan
+The native background Adhan scheduler is enabled in release `3.1.1 / code4`.
 
-### Device orientation / motion
-- Feature: digital compass / astronomical alignment.
-- Release rule: no generic Android runtime permission is added just for orientation/accelerometer sensor readings in this wrapper.
-- Acceptance: heading/motion update on a real device; device-specific browser sensor behavior tested.
-
-### Audio playback
-- Feature: Quran, Serenity, adhan preview, azkar audio while app is active.
-- Release rule: playback does not justify microphone permission.
-- Explicitly forbidden: `android.permission.RECORD_AUDIO`.
-
-## Gate B — Native background Adhan / Azkar scheduler: NOT enabled yet
-
-The requirement is stronger than ordinary PWA notifications: a selected adhan or dhikr must trigger at its configured time while the app is closed and the screen may be locked.
-
-This must be implemented as a real Android feature, then permissions are added with the implementation — never before.
-
-### Exact scheduling
-Candidate permission:
+Required special access:
 - `android.permission.SCHEDULE_EXACT_ALARM`
 
-Rules:
-- Use only for user-facing prayer/dhikr schedules that genuinely require exact timing.
-- Android special access is not pre-granted on fresh installs targeting modern Android.
-- Before scheduling, check `canScheduleExactAlarms()`.
-- Explain the need inside the app before opening the system "Alarms & reminders" access screen.
-- If access is revoked, degrade gracefully and show the user that exact reminders are disabled.
-- Reschedule after permission state changes and after reboot.
-- Do not use `USE_EXACT_ALARM` unless a separate Play-policy review proves it is appropriate.
+Release rules:
+- Actual prayer-time events use `AlarmManager.setExactAndAllowWhileIdle(...)`.
+- Before any exact event is scheduled, call `canScheduleExactAlarms()`.
+- When access is missing, an **interactive user action only** may open Android's `Alarms & reminders` screen using `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`.
+- Automatic/background refresh must never open permission UI.
+- `USE_EXACT_ALARM` remains forbidden; this app uses the user-granted `SCHEDULE_EXACT_ALARM` path.
+- Informational pre-prayer alerts remain separate inexact alarms; they do not alter the actual prayer-time event.
+- If exact access is unavailable or revoked, native Adhan ownership fails closed instead of claiming a valid schedule.
+- On grant, reboot, app replacement, device time change, or timezone change, the stored plan is rescheduled.
 
-### Background audio playback
-Expected permissions only when native playback service exists:
-- `android.permission.FOREGROUND_SERVICE`
-- `android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK`
+The web prayer engine remains the only source of prayer calculations. It sends a validated date-stamped plan to Android; Android does not duplicate the prayer equations.
 
-Expected component:
-- Android media playback foreground service / MediaSession-compatible service with `foregroundServiceType="mediaPlayback"`.
+## Native Adhan ownership
+- Android Native owns Adhan delivery only after the launcher confirms that notifications, exact-alarm access and a valid native schedule are active.
+- The existing Web Adhan scheduler remains a fallback only when Native ownership is not confirmed.
+- This prevents two simultaneous Adhan playbacks while preserving fallback behavior outside the installed Android path.
 
-Rules:
-- Use a media-style notification and proper audio focus.
-- Do not add microphone foreground-service types.
-- Android 15+ must not start a media playback foreground service directly from `BOOT_COMPLETED`.
-- Boot handling may restore/reschedule user alarms, but actual playback starts from the legitimate scheduled/user event flow.
+## Dated prayer plan
+- The native bridge accepts a validated plan of up to 180 days.
+- The plan is generated from the approved existing prayer calculation engine and must match the live displayed schedule for the current day before crossing the bridge.
+- The plan is refreshed when the app starts and after trusted location/prayer-runtime changes.
+- An exhausted plan fails closed; it must not replay stale daily times.
 
-### Reboot resilience
-A native scheduling implementation may require a boot receiver and the corresponding manifest capability to restore future schedules. This is not added until its code and test exist.
+## Camera
+- Feature: sun/moon astronomical observation.
+- Camera remains a web/TWA site permission.
+- Do **not** add `android.permission.CAMERA` merely for symmetry unless the native architecture later requires it.
 
-Acceptance for Gate B:
-1. Configure a dhikr reminder a few minutes ahead.
-2. Close/swipe away the app.
-3. Lock screen.
-4. Reminder fires at the configured time with the intended user experience.
-5. Repeat with an adhan schedule.
-6. Restart device, then confirm future schedules are restored without auto-playing audio at boot.
-7. Revoke exact-alarm access and verify safe degradation.
-8. Revoke notification permission and verify no crash / misleading success state.
-9. Test battery saver / Doze behavior on at least one real Android device.
+## Audio / privacy boundaries
+- Local Quran/Serenity/Adhan playback does not justify microphone permission.
+- Explicitly forbidden: `android.permission.RECORD_AUDIO`.
+- No background location permission.
+- No broad storage, contacts, calendar, SMS or call-log permissions.
+- `com.google.android.gms.permission.AD_ID` remains forbidden while the release is ad-free.
 
-## Explicitly forbidden for first release unless requirements change
-
-- `android.permission.RECORD_AUDIO` — no microphone capture.
-- `com.google.android.gms.permission.AD_ID` — first release is ad-free.
-- `android.permission.READ_EXTERNAL_STORAGE`
-- `android.permission.WRITE_EXTERNAL_STORAGE`
-- `android.permission.MANAGE_EXTERNAL_STORAGE`
-- contacts permissions.
-- calendar permissions.
-- SMS / call-log / phone permissions.
-- background location — current Qibla/prayer calculations do not justify continuous background location.
-
-## Google Play / privacy alignment
-
-- Developer account: Personal.
-- Brand: Qiblalabs.
-- GA4 is enabled for usage telemetry; our event layer must not send precise GNSS coordinates or camera observation data.
-- Privacy policy: `https://qiblalabs.com/privacy.html`.
-- First release: no advertising SDK.
-- Any future permission change requires re-checking Play Data safety and the privacy policy before production.
+## Native resilience acceptance
+Before Play upload, verify on a physical Android device:
+1. Fresh install and location permission.
+2. Enable Adhan from the explicit first-run action.
+3. Android 13+: allow `POST_NOTIFICATIONS`.
+4. Android 12+: allow `Alarms & reminders` when requested.
+5. Confirm actual Adhan at the displayed prayer minute with the app closed and screen locked.
+6. Confirm any pre-prayer reminder is separate and does not move the Adhan time.
+7. Confirm only one Adhan is heard when the TWA is open.
+8. Reboot the device and confirm future alarms are restored.
+9. Revoke exact-alarm access; confirm Native ownership fails closed and no misleading success state is shown on the next app launch.
+10. Revoke notification permission; confirm no crash and no false enabled state after the next activation attempt.
 
 ## Automated gates
-
-- `check_twa_config.py` verifies frozen TWA identity and configuration.
-- `check_generated_permissions.py` inspects the AndroidManifest generated by Bubblewrap and blocks unjustified permissions before the structural build.
-- `build_signed_release.ps1` runs configuration, API-36 and generated-permission gates before signing a local release.
+- `check_twa_config.py` verifies package and release identity.
+- `check_generated_permissions.py` inspects the merged **release** AndroidManifest and requires `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, the authenticated launcher/prayer-sync components and the exact-alarm grant receiver while rejecting `USE_EXACT_ALARM`.
+- `permissions-gnss-adhan-cycle.test.js` gates permission ordering, exact prayer scheduling, Native/Web ownership and the long dated plan.
+- `native-android-localization-security.test.js` gates the authenticated native bridge, local resources and background delivery contract.
+- `build_signed_release.ps1` remains the guarded local signing path; GitHub Actions also builds an unsigned AAB proof from current `main/source`.
