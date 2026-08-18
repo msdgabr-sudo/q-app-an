@@ -27,6 +27,8 @@ assert(azScheduler.includes('KEY_NEXT_ELAPSED'));
 assert(azScheduler.includes('scheduleNextFromDelivery'));
 assert(azScheduler.includes('restartAfterBoot'));
 assert(azScheduler.includes('restore(Context context)'));
+assert(azScheduler.includes('nextFutureTarget'));
+assert(azScheduler.includes('previousTarget + intervalMs'),'next reminder must stay anchored to intended cadence instead of drifting from delayed delivery');
 assert(!azScheduler.includes('setExact(')&&!azScheduler.includes('setExactAndAllowWhileIdle'),'Azkar must remain inexact; exact alarm access is reserved for prayer-time Adhan');
 assert(azScheduler.includes('PendingIntent.getBroadcast')&&azScheduler.includes('AzkarReminderReceiver.class'));
 assert(azReceiver.includes('channelIssue'));
@@ -138,13 +140,14 @@ assert(azWeb.includes("p.get('azkarResult')")&&azWeb.includes("p.get('azkarIssue
 assert(azWeb.includes("'intent://azkar-reminder?token='"));
 assert(azWeb.includes('package=com.qiblalabs'));
 assert(azWeb.includes('HANDOFF_TIMEOUT_MS=10000'));
-assert(azWeb.includes("row.style.setProperty('display','flex','important')"),'hidden status row must be restored for actionable Native feedback');
+assert(azWeb.includes("row.style.setProperty('display','flex','important')"),'status row must remain visible for actionable Native feedback');
 assert(azWeb.includes("'جاري تفعيل التنبيه...'"),'button must expose pending Native state rather than optimistic success');
 assert(azWeb.includes("showFailure('native-token')"),'missing Native token must not be silently swallowed');
 assert(!azWeb.includes("STORAGE_KEY='qiblaastro:native-azkar-reminder:v1'"),'legacy localStorage must not remain the Native source of truth');
 assert(!azWeb.includes('a.click()'));
 assert(azHost.includes("TOKEN_KEY='qiblaastro:native-token'")&&azHost.includes('seedFrameContext(frame)'));
-assert(azPage.includes('#azAudio .az-audio-status{display:none!important}'));
+assert(azPage.includes('#azAudio .az-audio-status{display:flex!important}'),'Azkar reminder status must be visibly rendered');
+assert(azPage.includes('azkar-native-reminders.js?v=20260818-native5'),'Azkar page must cache-bust the confirmed bridge release');
 
 // Current early-core boot and service-worker release.
 const bootstrap=read('js/presentation/bootstrap.js');
@@ -159,6 +162,6 @@ console.log('Native Android localization/security gate: PASS');
 console.log('Prayer: exact RTC_WAKEUP Adhan + separate inexact pre-alert + stable local audio channel: PASS');
 console.log('Prayer: POST_NOTIFICATIONS + user-granted SCHEDULE_EXACT_ALARM + confirmed native ownership: PASS');
 console.log('Prayer: cached 180-day authoritative dated plan + reboot/time/exact-permission restoration: PASS');
-console.log('Azkar: confirmed Native ownership + 15-minute minimum + inexact idle-safe scheduling: PASS');
+console.log('Azkar: confirmed Native ownership + 15-minute minimum + anchored inexact idle-safe scheduling: PASS');
 console.log('Azkar: notification permission/channel recovery + stable v2 local audio path + reboot/update restoration: PASS');
 console.log('Widget authenticated/localized contracts: PASS');
