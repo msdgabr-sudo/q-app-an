@@ -11,13 +11,22 @@ $JavaBridge = Join-Path $AppRoot 'src\main\java\com\qiblalabs\nativebridge'
 $JavaWidget = Join-Path $AppRoot 'src\main\java\com\qiblalabs\widget'
 $Res = Join-Path $AppRoot 'src\main\res'
 $Raw = Join-Path $Res 'raw'
+$WidgetDrawableDest = Join-Path $Res 'drawable'
 
 if (-not (Test-Path -LiteralPath $Manifest -PathType Leaf)) { throw "Generated AndroidManifest missing: $Manifest" }
 if (-not (Test-Path -LiteralPath $Src -PathType Container)) { throw "Native prayer/widget source missing: $Src" }
-New-Item -ItemType Directory -Force -Path $JavaBridge,$JavaWidget,(Join-Path $Res 'layout'),(Join-Path $Res 'xml'),$Raw | Out-Null
+New-Item -ItemType Directory -Force -Path $JavaBridge,$JavaWidget,(Join-Path $Res 'layout'),(Join-Path $Res 'xml'),$WidgetDrawableDest,$Raw | Out-Null
 Get-ChildItem -LiteralPath $Src -Filter '*.java' -File | Copy-Item -Destination $JavaBridge -Force
 Copy-Item -LiteralPath (Join-Path $WidgetSrc 'QiblaWidgetProvider.java') -Destination $JavaWidget -Force
-Copy-Item -LiteralPath (Join-Path $WidgetSrc 'qibla_widget.xml') -Destination (Join-Path $Res 'layout\qibla_widget.xml') -Force
+$widgetLayouts=@('qibla_widget.xml','qibla_widget_compact.xml','qibla_widget_large.xml')
+foreach($layout in $widgetLayouts){
+    $from=Join-Path $WidgetSrc $layout
+    if(-not(Test-Path -LiteralPath $from -PathType Leaf)){throw "Required responsive widget layout missing: $from"}
+    Copy-Item -LiteralPath $from -Destination (Join-Path $Res ('layout\'+$layout)) -Force
+}
+$widgetDrawableSrc=Join-Path $WidgetSrc 'res\drawable'
+if(-not(Test-Path -LiteralPath $widgetDrawableSrc -PathType Container)){throw "Widget drawable directory missing: $widgetDrawableSrc"}
+Get-ChildItem -LiteralPath $widgetDrawableSrc -Filter '*.xml' -File | Copy-Item -Destination $WidgetDrawableDest -Force
 Copy-Item -LiteralPath (Join-Path $WidgetSrc 'qibla_widget_info.xml') -Destination (Join-Path $Res 'xml\qibla_widget_info.xml') -Force
 $sets=@('values','values-en','values-fr','values-id','values-ur')
 foreach($set in $sets){$dest=Join-Path $Res $set;New-Item -ItemType Directory -Force -Path $dest|Out-Null;Copy-Item -LiteralPath (Join-Path $WidgetSrc "res\$set\strings.xml") -Destination (Join-Path $dest 'qiblaastro_widget_strings.xml') -Force;Copy-Item -LiteralPath (Join-Path $Src "res\$set\strings.xml") -Destination (Join-Path $dest 'qiblaastro_prayer_native_strings.xml') -Force}
@@ -77,4 +86,6 @@ if($token -notmatch 'SecureRandom' -or $token -notmatch 'MODE_PRIVATE'){throw 'P
 if($sync -notmatch 'MODE_PRIVATE'){throw 'Private native prayer/widget store requirement missing.'}
 if($location -notmatch 'NativeBridgeToken\.valid' -or $location -notmatch 'ACTION_LOCATION_SOURCE_SETTINGS'){throw 'Authenticated Android Location settings bridge missing.'}
 if($locationState -notmatch 'isLocationEnabled' -or $locationState -notmatch 'GPS_PROVIDER'){throw 'Android Location service-state reader missing.'}
-Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + Location settings + translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
+$widgetProvider=Get-Content -LiteralPath (Join-Path $JavaWidget 'QiblaWidgetProvider.java') -Raw
+if($widgetProvider -notmatch 'onAppWidgetOptionsChanged' -or $widgetProvider -notmatch 'qibla_widget_compact' -or $widgetProvider -notmatch 'qibla_widget_large'){throw 'Responsive premium widget provider integration missing.'}
+Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + Location settings + responsive translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
