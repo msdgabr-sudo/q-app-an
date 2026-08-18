@@ -2,9 +2,9 @@
 """Validate the merged release AndroidManifest used by the AAB.
 
 This gate verifies both permission policy and the native components required by
-first-run Adhan activation. It intentionally inspects Gradle's merged RELEASE
-manifest because dependency manifests and Bubblewrap generation can change the
-final package surface.
+first-run Adhan activation plus the authenticated Android Location-settings bridge.
+It intentionally inspects Gradle's merged RELEASE manifest because dependency
+manifests and Bubblewrap generation can change the final package surface.
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ EXPECTED_VERSION_NAME = "3.1.1"
 EXPECTED_VERSION_CODE = "4"
 LAUNCHER = "com.qiblalabs.nativebridge.QiblaLauncherActivity"
 PRAYER_SYNC = "com.qiblalabs.nativebridge.PrayerWidgetSyncActivity"
+LOCATION_SETTINGS = "com.qiblalabs.nativebridge.LocationSettingsActivity"
 PRAYER_BOOT = "com.qiblalabs.nativebridge.PrayerBootReceiver"
 errors: list[str] = []
 notes: list[str] = []
@@ -61,6 +62,7 @@ for permission in sorted(required):
         errors.append(f"required release permission missing from merged manifest: {permission}")
 
 forbidden = {
+    "android.permission.ACCESS_BACKGROUND_LOCATION": "foreground location is sufficient; this feature only opens system Location settings",
     "android.permission.RECORD_AUDIO": "microphone is not used; audio is playback-only",
     "com.google.android.gms.permission.AD_ID": "first release is ad-free",
     "android.permission.READ_EXTERNAL_STORAGE": "app does not need broad media/file access",
@@ -84,6 +86,7 @@ else:
     receivers = {r.get(ANDROID + "name"): r for r in application.findall("receiver") if r.get(ANDROID + "name")}
     launcher = activities.get(LAUNCHER)
     sync = activities.get(PRAYER_SYNC)
+    location_settings = activities.get(LOCATION_SETTINGS)
     boot = receivers.get(PRAYER_BOOT)
     if launcher is None:
         errors.append(f"native authenticated launcher missing from merged release: {LAUNCHER}")
@@ -121,6 +124,29 @@ else:
         if not bridge_ok:
             errors.append("PrayerWidgetSyncActivity qiblaastro://prayer-sync VIEW/BROWSABLE contract is missing")
 
+    if location_settings is None:
+        errors.append(f"native Location settings Activity missing from merged release: {LOCATION_SETTINGS}")
+    else:
+        if location_settings.get(ANDROID + "exported") != "true":
+            errors.append("LocationSettingsActivity must be exported=true for the authenticated TWA intent")
+        location_bridge_ok = False
+        for filt in location_settings.findall("intent-filter"):
+            actions = {x.get(ANDROID + "name") for x in filt.findall("action")}
+            categories = {x.get(ANDROID + "name") for x in filt.findall("category")}
+            data = filt.find("data")
+            if (
+                "android.intent.action.VIEW" in actions
+                and "android.intent.category.DEFAULT" in categories
+                and "android.intent.category.BROWSABLE" in categories
+                and data is not None
+                and data.get(ANDROID + "scheme") == "qiblaastro"
+                and data.get(ANDROID + "host") == "location-settings"
+            ):
+                location_bridge_ok = True
+                break
+        if not location_bridge_ok:
+            errors.append("LocationSettingsActivity qiblaastro://location-settings VIEW/BROWSABLE contract is missing")
+
     if boot is None:
         errors.append(f"prayer reboot/exact-permission receiver missing: {PRAYER_BOOT}")
     else:
@@ -133,6 +159,8 @@ else:
 notes.append("source: Gradle merged RELEASE manifest; dependency manifests included")
 notes.append("release identity: QiblaAstro 3.1.1 code4")
 notes.append("native Adhan path: QiblaLauncherActivity token -> PrayerWidgetSyncActivity -> POST_NOTIFICATIONS -> SCHEDULE_EXACT_ALARM -> exact prayer alarm")
+notes.append("Location path: launcher publishes ON/OFF only -> authenticated LocationSettingsActivity -> Android Location settings -> launcher refresh")
+notes.append("ACCESS_BACKGROUND_LOCATION remains forbidden; coordinates stay owned by the existing foreground GNSS path")
 notes.append("camera remains a web/TWA site permission; CAMERA is not forced into wrapper manifest")
 notes.append("USE_EXACT_ALARM remains forbidden; exact alarm access is user-granted through SCHEDULE_EXACT_ALARM")
 
@@ -149,4 +177,4 @@ if errors:
         print("ERROR:", error, file=sys.stderr)
     print(f"FAILED: {len(errors)} merged-release issue(s)", file=sys.stderr)
     raise SystemExit(1)
-print("PASS: release 3.1.1 code4 contains the authenticated exact native Adhan permission path")
+print("PASS: release 3.1.1 code4 contains authenticated Adhan and Android Location-service settings paths")

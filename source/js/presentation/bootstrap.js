@@ -23,6 +23,7 @@ function captureNativeTokenEarly(){
 
 function loadScript(src,marker,onload){if(!root.document)return;if(root.document.querySelector('script['+marker+']')){if(onload)onload();return;}var s=root.document.createElement('script');s.src=src;s.async=false;s.setAttribute(marker,'true');if(onload)s.onload=onload;(root.document.head||root.document.documentElement).appendChild(s);}
 function loadStyle(href,marker){if(!root.document||root.document.querySelector('link['+marker+']'))return;var l=root.document.createElement('link');l.rel='stylesheet';l.href=href;l.setAttribute(marker,'true');(root.document.head||root.document.documentElement).appendChild(l);}
+function loadLocationServiceControl(){loadScript('js/presentation/location-service-control.js?v=20260818-native-location1','data-qibla-location-service-control');}
 function flushPrayerCore(){var q=prayerCoreWaiters.splice(0);q.forEach(function(fn){try{fn();}catch(_){}});}
 function loadPrayerCore(onready){
   if(typeof onready==='function')prayerCoreWaiters.push(onready);
@@ -60,6 +61,7 @@ function loadQuran(){if(quranRequested)return;quranRequested=true;loadScript('js
 function loadSerenity(){if(serenityRequested)return;serenityRequested=true;var attempts=0;function mountWhenReady(){var loader=root.QiblaPresentationPageLoader;if(loader&&typeof loader.mount==='function'){loader.mount('serenity').then(function(){loadScript('js/presentation/serenity/screen.js?v=20260810-serenity-editions2','data-qibla-serenity-screen',function(){if(root.QiblaSerenityScreen&&typeof root.QiblaSerenityScreen.mount==='function')root.QiblaSerenityScreen.mount();});}).catch(function(){serenityRequested=false;});return;}attempts++;if(attempts<80)root.setTimeout(mountWhenReady,50);else serenityRequested=false;}mountWhenReady();}
 function start(){
   captureNativeTokenEarly();
+  loadLocationServiceControl();
   loadPrayerCore(loadPermissions);
   loadInternalChrome();loadInternalLanguageBridge();loadSafeI18n();loadCompass();loadPrayer();loadFalaki();loadAzkar();loadQuran();loadSerenity();
 }

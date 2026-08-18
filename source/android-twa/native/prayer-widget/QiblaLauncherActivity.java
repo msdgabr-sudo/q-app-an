@@ -10,7 +10,7 @@ import android.os.Build;
 
 import com.google.androidbrowserhelper.trusted.LauncherActivity;
 
-/** Adds the per-install secret plus confirmed Native Adhan/Azkar state in the URL fragment only. */
+/** Adds the per-install secret plus confirmed Native Adhan/Azkar/Location state in the URL fragment only. */
 public final class QiblaLauncherActivity extends LauncherActivity {
     private static final String AZKAR_PREFS = "qiblaastro_azkar_native";
     private static final String AZKAR_ENABLED = "enabled";
@@ -22,6 +22,7 @@ public final class QiblaLauncherActivity extends LauncherActivity {
     protected Uri getLaunchingUrl() {
         Uri base = super.getLaunchingUrl();
         String token = NativeBridgeToken.getOrCreate(this);
+        boolean nativeLocation = NativeLocationState.isEnabled(this);
         boolean notificationsReady = Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
         boolean nativeAdhan = notificationsReady && PrayerNativeScheduler.nativeActive(this);
 
@@ -40,6 +41,7 @@ public final class QiblaLauncherActivity extends LauncherActivity {
 
         StringBuilder fragment = new StringBuilder()
                 .append("nativeToken=").append(Uri.encode(token))
+                .append("&nativeLocation=").append(nativeLocation ? "1" : "0")
                 .append("&nativeAdhan=").append(nativeAdhan ? "1" : "0")
                 .append("&nativeAzkar=").append(nativeAzkar ? "1" : "0")
                 .append("&azkarInterval=").append(azkarInterval)
