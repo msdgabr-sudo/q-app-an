@@ -50,6 +50,7 @@ public final class PrayerNativeScheduler {
         boolean dateStamped = plan != null && !plan.isEmpty();
         boolean hasEnabledPrayer=false;
         boolean scheduled=true;
+        int scheduledPrayerCount=0;
         for (int i=0;i<IDS.length;i++) {
             String id = IDS[i];
             String mode = p.getString("mode_"+id, "off");
@@ -64,13 +65,13 @@ public final class PrayerNativeScheduler {
                 if (minute < 0 || minute >= 1440) continue;
                 actual = nextOccurrence(now, minute, tz);
             }
-            if(!scheduleOne(context, BASE_REQ+i, id, mode, false, actual))scheduled=false;
+            if(scheduleOne(context, BASE_REQ+i, id, mode, false, actual))scheduledPrayerCount++;else scheduled=false;
             if (advance > 0) {
                 long pre = actual - advance*60_000L;
                 if (pre > now + 5000L && !scheduleOne(context, PRE_REQ+i, id, "notification", true, pre))scheduled=false;
             }
         }
-        boolean active=hasEnabledPrayer&&scheduled;
+        boolean active=hasEnabledPrayer&&scheduled&&scheduledPrayerCount>0;
         p.edit().putBoolean(KEY_NATIVE_ACTIVE,active).apply();
         return active;
     }
