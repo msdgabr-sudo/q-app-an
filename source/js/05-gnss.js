@@ -116,7 +116,7 @@ function hideManualCal(){
 }
 
 function tryBrowserGPS(){
-  if(gnssUpdating||gnssHasTrustedFix)return;
+  if(gnssUpdating)return;
   gnssUpdating=true;
   _clearGnssRetry();
   set('compass-status-msg','⏳ جاري تحديث موقعك من GNSS...');
