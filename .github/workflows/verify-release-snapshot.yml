@@ -3,11 +3,18 @@ name: Verify main release source and build unsigned AAB
 # SINGLE-BRANCH RELEASE GATE
 # --------------------------
 # `main` is the authoritative source for both the deployed web application and
-# Android release builds. This workflow proves that the generated release AAB
-# contains the native first-run Adhan/notification path, not only the web code.
+# Android release builds. Pull requests validate their candidate merge state;
+# pushes to main remain the authoritative release proof.
 
 on:
   push:
+    branches: [main]
+    paths:
+      - 'source/**'
+      - '.github/workflows/verify-release-snapshot.yml'
+      - 'RELEASE_SOURCE.md'
+      - 'REPOSITORY_STATE.md'
+  pull_request:
     branches: [main]
     paths:
       - 'source/**'
@@ -30,8 +37,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: main
 
       - uses: actions/setup-node@v6
         with:
@@ -47,9 +52,9 @@ jobs:
             echo 'ERROR: secret material is forbidden in the release repository.' >&2
             exit 1
           fi
-          echo 'Baseline provenance marker verified. Current main/source remains authoritative.'
+          echo 'Baseline provenance marker verified. Current release candidate remains derived from main/source.'
 
-      - name: Run current main source release gates
+      - name: Run current release source gates
         working-directory: source
         run: |
           set -euo pipefail
@@ -67,6 +72,7 @@ jobs:
           node tests/a2-phone-ui-regressions.test.js
           node tests/permissions-gnss-adhan-cycle.test.js
           node tests/location-service-cycle.test.js
+          node tests/widget-premium-responsive.test.js
           node tests/astronomical-verification-store-persistence.test.js
           node tests/native-android-localization-security.test.js
           node tests/pre-native-release-readiness.test.js
@@ -74,7 +80,7 @@ jobs:
       - name: Pull pinned Bubblewrap toolchain
         run: docker pull "$BUBBLEWRAP_IMAGE"
 
-      - name: Generate Android project from current main TWA manifest
+      - name: Generate Android project from current TWA manifest
         run: |
           set -euo pipefail
           docker run --rm -v "$PWD/source/android-twa:/app" -w /app "$BUBBLEWRAP_IMAGE" update --manifest twa-manifest.json --skipVersionUpgrade
@@ -130,7 +136,7 @@ jobs:
       - name: Upload unsigned AAB proof artifact
         uses: actions/upload-artifact@v6
         with:
-          name: QiblaAstro-3.1.1-code4-native-Adhan-AAB-proof
+          name: QiblaAstro-3.1.1-code4-release-candidate-AAB-proof
           path: |
             dist/QiblaAstro-3.1.1-code4-unsigned.aab
             dist/QiblaAstro-3.1.1-code4-unsigned.aab.sha256
