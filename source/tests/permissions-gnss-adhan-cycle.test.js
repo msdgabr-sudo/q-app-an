@@ -5,6 +5,7 @@ const read=p=>fs.readFileSync(p,'utf8');
 const permissions=read('js/presentation/permissions-onboarding.js');
 const gnss=read('js/05-gnss.js');
 const nav=read('js/06-navigation.js');
+const bootstrap=read('js/presentation/bootstrap.js');
 const index=read('index.html');
 const sync=read('js/presentation/prayer/schedule-sync.js');
 const runtime=read('js/runtime/trusted-location-dependent-sync.js');
@@ -55,7 +56,8 @@ assert(nativeScheduler.includes('AlarmManager.RTC_WAKEUP')&&nativeScheduler.incl
 assert(nativeScheduler.includes('PendingIntent.getBroadcast')&&nativeScheduler.includes('PrayerNotificationReceiver.class'),'Native Adhan delivery must remain BroadcastReceiver-based');
 assert(nativeReceiver.includes('USAGE_ALARM')&&nativeReceiver.includes('rawForAdhan'),'Native receiver must retain local Adhan alarm audio');
 
-// Service worker must refresh this exact integration without creating another GNSS engine.
+// Service worker and loader must force this exact integration to replace stale first-run code.
+assert(bootstrap.includes('permissions-onboarding.js?v=20260818-location-adhan2'),'Bootstrap must request the fresh permissions cycle asset');
 assert(sw.includes("'./js/presentation/permissions-onboarding.js'"),'Permissions integration must stay in critical cache');
 assert(sw.includes("PERMISSIONS_RELEASE='location-adhan-cycle-20260818'"),'Service worker must advertise the current permissions cycle release');
 assert(!sw.includes("'./js/05-gnss.js'"),'Service worker must not activate the unused external GNSS implementation beside the production inline engine');
