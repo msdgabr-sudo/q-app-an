@@ -1,10 +1,10 @@
-/* QiblaAstro Service Worker v6.16 — direct native bridges + trusted GNSS startup recovery + Quran/Azkar Back bridges
+/* QiblaAstro Service Worker v6.17 — confirmed Adhan permission handoff + trusted GNSS startup recovery + Quran/Azkar Back bridges
  * © 2026 Mohamed SG Behairy. All Rights Reserved. */
 'use strict';
-const VERSION='qiblaastro-v6.16-azkar-direct-native';
+const VERSION='qiblaastro-v6.17-adhan-permission-handoff';
 const BRIDGE_RELEASE='prayer-direct-20260818';
 const GNSS_RELEASE='trusted-startup-recovery-20260818';
-const PERMISSIONS_RELEASE='location-adhan-cycle-20260818';
+const PERMISSIONS_RELEASE='location-adhan-cycle-20260818-v2';
 const CACHE_PREFIX='qiblaastro-';
 const APP_CACHE=VERSION+'-app';
 const RUNTIME_CACHE=VERSION+'-runtime';

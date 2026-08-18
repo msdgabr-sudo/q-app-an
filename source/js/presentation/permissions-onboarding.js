@@ -74,7 +74,15 @@ function prayerRuntimeReady(){
   }catch(_){ }
   return false;
 }
-function nativePrayerBridgeReady(){return !!(root.QiblaPrayerNativeSync&&typeof root.QiblaPrayerNativeSync.sync==='function');}
+function nativePrayerBridgeStatus(){
+  try{
+    var api=root.QiblaPrayerNativeSync;
+    if(!api||typeof api.getReadiness!=='function'||typeof api.activate!=='function')return {ready:false,reason:'bridge-version'};
+    var status=api.getReadiness();
+    return status&&typeof status==='object'?status:{ready:false,reason:'bridge-status'};
+  }catch(_){return {ready:false,reason:'bridge-error'};}
+}
+function nativePrayerBridgeReady(){return nativePrayerBridgeStatus().ready===true;}
 function clearGnssRecovery(){if(gnssRecoveryTimer!==null){try{root.clearTimeout(gnssRecoveryTimer);}catch(_){}gnssRecoveryTimer=null;}}
 function scheduleGnssRecovery(){
   if(trustedGnssReady()){clearGnssRecovery();gnssRecoveryAttempt=0;return;}
@@ -159,12 +167,19 @@ function note(text){var n=root.document.getElementById('qa-permission-note');if(
 function primaryButton(){return root.document.getElementById('qa-permission-allow');}
 function closeOverlay(markDone){var n=root.document.getElementById('qa-permission-overlay');if(n)n.remove();if(markDone)mergeState({completed:true,completedAt:Date.now()});}
 function clearAdhanPrepare(){if(adhanPrepareTimer!==null){try{root.clearTimeout(adhanPrepareTimer);}catch(_){}adhanPrepareTimer=null;}}
+function bridgeWaitMessage(status){
+  var reason=status&&status.reason?status.reason:'';
+  if(reason==='native-token'||reason==='bridge-version')return 'لم تكتمل قناة الربط مع Android. أغلق التطبيق وافتحه من أيقونة QiblaAstro ثم أعد المحاولة.';
+  if(reason==='plan-loading'||reason==='native-plan'||reason==='prayer-times')return 'يتم تجهيز جدول الصلاة المحلي قبل تسليمه إلى Android. انتظر لحظات ثم أعد المحاولة.';
+  if(reason==='adhan-ui')return 'يتم تجهيز إعدادات الأذان المحلية. انتظر لحظات ثم أعد المحاولة.';
+  return 'لم يكتمل موقع GNSS أو جدول الصلاة بعد. تأكد أن خدمة الموقع مفعّلة ثم أعد المحاولة.';
+}
 function showAdhanStage(){
   clearAdhanPrepare();
   var btn=primaryButton();if(!btn)return;
   btn.disabled=false;btn.dataset.stage='adhan';btn.textContent='تفعيل الأذان والمتابعة';
   setState('location','granted');setState('notifications','ready');
-  note('الموقع أصبح جاهزًا. اضغط لتسليم جدول الصلاة الحالي إلى Android وطلب إذن الإشعارات الأصلي عند الحاجة.');
+  note('الموقع وجدول الصلاة وقناة Android جاهزة. اضغط لتفعيل الأذان وطلب إذن الإشعارات الأصلي عند الحاجة.');
 }
 function prepareAdhanStage(reset){
   if(!isTwaSurface()){
@@ -175,33 +190,36 @@ function prepareAdhanStage(reset){
   if(trustedGnssReady()&&prayerRuntimeReady()&&nativePrayerBridgeReady()){showAdhanStage();return;}
   var btn=primaryButton();if(btn){btn.disabled=true;btn.dataset.stage='prepare';btn.textContent='جاري تحديد الموقع وتجهيز الأذان...';}
   setState('location',trustedGnssReady()?'granted':'locating');setState('notifications','contextual');
-  note('يتم الآن الحصول على موقع GNSS الموثوق وتجهيز مواقيت الصلاة. لن يتم استخدام موقع تقريبي أو افتراضي.');
+  note('يتم الآن الحصول على موقع GNSS الموثوق وتجهيز مواقيت الصلاة وقناة Android. لن يتم استخدام موقع تقريبي أو افتراضي.');
   if(Date.now()-adhanPrepareStartedAt>=ADHAN_PREPARE_TIMEOUT){
     clearAdhanPrepare();
     if(btn){btn.disabled=false;btn.dataset.stage='location';btn.textContent='إعادة المحاولة';}
-    note('لم يكتمل موقع GNSS أو جدول الصلاة بعد. تأكد أن خدمة الموقع مفعّلة ثم أعد المحاولة.');
+    note(bridgeWaitMessage(nativePrayerBridgeStatus()));
     return;
   }
   adhanPrepareTimer=root.setTimeout(function(){adhanPrepareTimer=null;recoverTrustedGnss(false);prepareAdhanStage(false);},350);
 }
+function failNativeAdhanActivation(btn){
+  mergeState({completed:false,notifications:'contextual',adhanNativeRequested:false});
+  if(btn){btn.disabled=false;btn.dataset.stage='adhan';btn.textContent='تفعيل الأذان والمتابعة';}
+  setState('notifications','contextual');
+  note('لم يؤكد Android استلام طلب التفعيل. أعد المحاولة؛ وإذا استمرت المشكلة أغلق التطبيق وافتحه من أيقونته ثم حاول مرة أخرى.');
+}
 function activateNativeAdhan(){
   var btn=primaryButton();if(!btn)return;
   if(!trustedGnssReady()||!prayerRuntimeReady()||!nativePrayerBridgeReady()){prepareAdhanStage(true);return;}
-  btn.disabled=true;btn.textContent='جاري تفعيل الأذان...';
-  /* Persist before the custom-scheme handoff because Android may take focus
-     immediately. If the bridge cannot launch synchronously, roll the state back. */
-  mergeState({completed:true,location:'granted',notifications:'requested',adhanNativeRequested:true,twa:true,completedAt:Date.now()});
-  var launched=false;
-  try{launched=root.QiblaPrayerNativeSync.sync()===true;}catch(_){launched=false;}
-  if(!launched){
-    mergeState({completed:false,adhanNativeRequested:false});
-    btn.disabled=false;btn.dataset.stage='adhan';btn.textContent='تفعيل الأذان والمتابعة';
-    setState('notifications','contextual');
-    note('تعذر تسليم جدول الصلاة إلى Android الآن. انتظر لحظات ثم أعد المحاولة.');
-    return;
-  }
+  btn.disabled=true;btn.dataset.stage='adhan';btn.textContent='جاري تفعيل الأذان...';
   setState('notifications','requested');
-  closeOverlay(false);
+  mergeState({completed:false,location:'granted',notifications:'requested',adhanNativeRequested:false,twa:true});
+  var activation=null;
+  try{activation=root.QiblaPrayerNativeSync.activate();}catch(_){activation=null;}
+  if(!activation||typeof activation.then!=='function'){failNativeAdhanActivation(btn);return;}
+  activation.then(function(confirmed){
+    if(!confirmed){failNativeAdhanActivation(btn);return;}
+    mergeState({completed:true,location:'granted',notifications:'requested',adhanNativeRequested:true,twa:true,completedAt:Date.now()});
+    setState('notifications','requested');
+    closeOverlay(false);
+  }).catch(function(){failNativeAdhanActivation(btn);});
 }
 
 async function runPermissionRequest(){
