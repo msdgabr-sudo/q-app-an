@@ -38,9 +38,13 @@ assert(permissions.includes('trustedGnssReady()'));
 assert(gnss.includes('gnssHasTrustedFix')&&gnss.includes("gnssSource='gps'"));
 assert(!/ipapi|ipinfo|geolocation-db|fetch\s*\(/i.test(gnss));
 assert(!nav.includes("gnssSource==='default'")&&!nav.includes('gnssSource==="default"'));
-for(const forbidden of ['calcQibla(','refreshMdeclFromTrustedGnss(','calcPrayers(','sunPos(','moonPos(','AstroVerification']){
+for(const forbidden of ['calcQibla(','refreshMdeclFromTrustedGnss(','calcPrayers(','sunPos(','moonPos(']){
   assert(!permissions.includes(forbidden),`Permissions integration touched protected calculation token: ${forbidden}`);
 }
+// The permissions layer may hand control to the pre-existing astronomical verification API after
+// camera permission succeeds, but it must not implement or duplicate any protected calculation.
+assert.strictEqual((permissions.match(/AstroVerification/g)||[]).length,1,'permissions layer must only reference the existing verification API once');
+assert(permissions.includes('var api=root.AstroVerification;')&&permissions.includes('api.startProductionVerification();'),'camera permission gate must delegate to the existing verification API');
 assert(runtime.includes('QiblaPrayerMethods.calculate'));
 assert(bootstrap.includes("css/compass-confidence-final.css?v=20260809-reference-ui1"),'Adhan work must not alter compass assets');
 
