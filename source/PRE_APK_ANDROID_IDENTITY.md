@@ -21,6 +21,8 @@
 - Native prayer delivery: authenticated Android bridge with `POST_NOTIFICATIONS` + user-granted `SCHEDULE_EXACT_ALARM`
 - Actual prayer-time event: `AlarmManager.setExactAndAllowWhileIdle`
 - Restricted `USE_EXACT_ALARM`: `Not used`
+- Native Azkar reminder: authenticated Android bridge, minimum 15 minutes, `POST_NOTIFICATIONS`, inexact `setAndAllowWhileIdle`
+- Azkar exact-alarm usage: `None` — exact scheduling remains reserved for prayer-time Adhan
 
 ## Analytics/privacy boundary
 
@@ -35,8 +37,8 @@ The release analytics implementation is web/TWA `gtag.js` only. It does not add 
 3. Do not publish Digital Asset Links with a guessed certificate fingerprint.
 4. Keep signing material outside the repository.
 5. Target API 36.
-6. Require the merged release manifest to contain the authenticated `QiblaLauncherActivity` and `PrayerWidgetSyncActivity` bridge.
-7. Require `POST_NOTIFICATIONS` and `SCHEDULE_EXACT_ALARM` for enabled Native Adhan on applicable Android versions.
+6. Require the merged release manifest to contain the authenticated `QiblaLauncherActivity`, `PrayerWidgetSyncActivity`, and `AzkarReminderActivity` bridges.
+7. Require `POST_NOTIFICATIONS` for Native Adhan/Azkar, and `SCHEDULE_EXACT_ALARM` only for exact Native Adhan on applicable Android versions.
 8. Reject `USE_EXACT_ALARM`, `AD_ID`, microphone, broad storage and unrelated sensitive permissions.
 9. Build and test the AAB on the appropriate Google Play testing track before production.
 10. Do not change QT, compass, WMM2025, astronomical verification, camera or prayer equations as part of Android wrapper work.
@@ -52,6 +54,17 @@ The release analytics implementation is web/TWA `gtag.js` only. It does not add 
 - The legacy Web Adhan scheduler remains a fallback only while Native ownership is not confirmed, preventing duplicate playback.
 - Reboot, app replacement, device time/timezone changes and exact-alarm grant changes trigger rescheduling from the stored plan.
 
+## Native Azkar reminder release contract
+
+- Android Native is the source of truth for whether the repeating Azkar reminder is running.
+- The minimum selectable interval is 15 minutes; 5/10-minute values are rejected/normalized by the Native bridge.
+- Azkar uses an inexact idle-safe `ELAPSED_REALTIME_WAKEUP` alarm and does not consume exact-alarm access.
+- The next target is anchored to the intended interval chain so a delayed Android delivery does not permanently accumulate timing drift.
+- Android confirms start/stop/failure back through the authenticated launcher before the Web UI reports the reminder as active.
+- Denied/disabled notifications and muted notification channels are surfaced as recoverable states instead of silent button failures.
+- Phrase channels use a fresh `v2` contract and stable named local raw-audio URIs rather than persisted numeric resource IDs.
+- Reboot/app replacement restores an enabled reminder from private Native state.
+
 ## Build tooling decision
 
 - Generate the Android wrapper from `android-twa/twa-manifest.json` using the guarded Bubblewrap path.
@@ -66,11 +79,14 @@ The release analytics implementation is web/TWA `gtag.js` only. It does not add 
 - Required icons and maskable icons validated.
 - Location and camera flows validated on a physical device.
 - `POST_NOTIFICATIONS` allow/deny paths validated.
-- `Alarms & reminders` allow/deny paths validated on Android 12+.
+- `Alarms & reminders` allow/deny paths validated on Android 12+ for Native Adhan.
 - Adhan fires at the displayed prayer minute with the app closed and screen locked.
 - Optional pre-prayer notification does not change the Adhan time.
 - Only one Adhan plays while the TWA is open.
 - Future prayer alarms restore after device restart.
 - Revoked exact-alarm or notification access does not produce a false-success state.
+- Azkar screen exposes a 15-minute-or-greater interval and confirms Native start before showing `إيقاف التنبيه`.
+- Azkar reminder produces the selected local voice notification with the TWA closed; denial/muted-channel paths show recoverable feedback.
+- Azkar reminder restores after reboot/app replacement without adding exact-alarm access.
 - Package/version fields match `3.1.1 / code4`.
 - Digital Asset Links and Play signing certificate are verified before final rollout.
