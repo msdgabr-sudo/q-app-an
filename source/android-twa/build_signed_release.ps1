@@ -13,9 +13,9 @@ function Require-Command([string]$Name) {
 }
 
 Write-Host 'QiblaAstro ELITE — guarded Android AAB/APK build and signing' -ForegroundColor Cyan
-Write-Host 'Release branch: a2-release-prep'
+Write-Host 'Release source: main/source'
 Write-Host 'Package: com.qiblalabs'
-Write-Host 'Version: 3.1.0 (code 3)'
+Write-Host 'Version: 3.1.1 (code 4)'
 Write-Host 'Target: Android 16 / API 36'
 Write-Host 'Origin: https://app.qiblalabs.com'
 Write-Host ''
@@ -53,7 +53,7 @@ Write-Host '[5/14] Apply localized native Azkar reminders...' -ForegroundColor Y
 & .\apply_native_azkar_reminders.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Native Azkar reminder patch/gate failed.' }
 
-Write-Host '[6/14] Apply authenticated prayer notifications and home Widget...' -ForegroundColor Yellow
+Write-Host '[6/14] Apply authenticated exact prayer notifications, local Adhan and home Widget...' -ForegroundColor Yellow
 & .\apply_native_widget.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Authenticated prayer/widget patch/gate failed.' }
 
@@ -65,10 +65,20 @@ $GeneratedManifestText = Get-Content -LiteralPath $GeneratedManifest -Raw
 foreach ($RequiredComponent in @('QiblaLauncherActivity','PrayerWidgetSyncActivity','QiblaWidgetProvider')) {
     if (-not $GeneratedManifestText.Contains($RequiredComponent)) { throw "Generated native component missing: $RequiredComponent" }
 }
+foreach ($RequiredPermission in @('android.permission.POST_NOTIFICATIONS','android.permission.SCHEDULE_EXACT_ALARM')) {
+    if (-not $GeneratedManifestText.Contains($RequiredPermission)) { throw "Generated native permission missing: $RequiredPermission" }
+}
+if ($GeneratedManifestText.Contains('android.permission.USE_EXACT_ALARM')) { throw 'Restricted USE_EXACT_ALARM must remain absent.' }
 if ($GeneratedManifestText.Contains('WidgetDataActivity')) { throw 'Legacy WidgetDataActivity must remain absent.' }
 $SyncActivity = Join-Path $Here 'app\src\main\java\com\qiblalabs\nativebridge\PrayerWidgetSyncActivity.java'
+$Scheduler = Join-Path $Here 'app\src\main\java\com\qiblalabs\nativebridge\PrayerNativeScheduler.java'
 if (-not (Test-Path -LiteralPath $SyncActivity -PathType Leaf)) { throw 'PrayerWidgetSyncActivity.java missing after native injection.' }
-if (-not (Get-Content -LiteralPath $SyncActivity -Raw).Contains('NativeBridgeToken.valid')) { throw 'Per-install native bridge token validation missing.' }
+if (-not (Test-Path -LiteralPath $Scheduler -PathType Leaf)) { throw 'PrayerNativeScheduler.java missing after native injection.' }
+$SyncText = Get-Content -LiteralPath $SyncActivity -Raw
+$SchedulerText = Get-Content -LiteralPath $Scheduler -Raw
+if (-not $SyncText.Contains('NativeBridgeToken.valid')) { throw 'Per-install native bridge token validation missing.' }
+if (-not $SyncText.Contains('ACTION_REQUEST_SCHEDULE_EXACT_ALARM')) { throw 'Exact-alarm special-access request path missing.' }
+if (-not $SchedulerText.Contains('setExactAndAllowWhileIdle')) { throw 'Exact prayer-time scheduling path missing.' }
 
 $Gradle = Join-Path $Here 'app\build.gradle'
 if (-not (Test-Path -LiteralPath $Gradle -PathType Leaf)) { throw 'Generated app/build.gradle missing.' }
@@ -100,9 +110,9 @@ if (-not (Test-Path -LiteralPath $GradleWrapper -PathType Leaf)) { throw 'Genera
 & $GradleWrapper ':app:processReleaseMainManifest' '--no-daemon'
 if ($LASTEXITCODE -ne 0) { throw 'Release manifest merge task failed.' }
 
-Write-Host '[10/14] Validate merged release Android permissions...' -ForegroundColor Yellow
+Write-Host '[10/14] Validate merged release Android permissions and native Adhan contract...' -ForegroundColor Yellow
 & python .\check_generated_permissions.py
-if ($LASTEXITCODE -ne 0) { throw 'Merged release permission gate failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'Merged release permission/native gate failed.' }
 
 Write-Host '[11/14] Build unsigned APK + AAB with Bubblewrap...' -ForegroundColor Yellow
 Write-Host 'Signing is intentionally skipped during compilation.' -ForegroundColor DarkYellow
@@ -139,7 +149,8 @@ $Artifacts | Select-Object FullName,Length,LastWriteTime | Format-Table -AutoSiz
 Get-FileHash -Algorithm SHA256 -LiteralPath $SignedAab,$SignedApk | Format-Table -AutoSize
 Write-Host 'PASS: local AAB/APK build and signing completed through all guarded release gates.' -ForegroundColor Green
 Write-Host 'Native Azkar reminders: INCLUDED.' -ForegroundColor Green
-Write-Host 'Authenticated prayer notifications + local Adhan: INCLUDED.' -ForegroundColor Green
+Write-Host 'Authenticated exact prayer-time Adhan: INCLUDED.' -ForegroundColor Green
+Write-Host 'POST_NOTIFICATIONS + user-granted SCHEDULE_EXACT_ALARM contract: VERIFIED.' -ForegroundColor Green
 Write-Host 'Authenticated home Widget: INCLUDED.' -ForegroundColor Green
 Write-Host 'Legacy WidgetDataActivity: FORBIDDEN.' -ForegroundColor Green
 Write-Host 'Target SDK: 36.' -ForegroundColor Green
