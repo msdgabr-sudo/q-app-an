@@ -2,10 +2,14 @@ package com.qiblalabs.azkar;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.NotificationManager;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.widget.Toast;
 
 import com.qiblalabs.R;
@@ -14,10 +18,11 @@ import com.qiblalabs.nativebridge.NativeBridgeToken;
 /** User-initiated and per-install-authenticated bridge from the TWA into native Azkar reminders. */
 public final class AzkarReminderActivity extends Activity {
     private static final int REQ_NOTIFICATIONS = 7126;
-    private static final int MIN_INTERVAL_MINUTES = 5;
+    private static final int REQ_NOTIFICATION_SETTINGS = 7127;
+    private static final int REQ_CHANNEL_SETTINGS = 7128;
     private static final int MAX_INTERVAL_MINUTES = 1440;
 
-    private int pendingInterval = 10;
+    private int pendingInterval = AzkarReminderScheduler.DEFAULT_INTERVAL_MINUTES;
     private String pendingPhrase = "subhanallah";
     private String pendingText = "ذكر الله";
 
@@ -28,22 +33,45 @@ public final class AzkarReminderActivity extends Activity {
         String mode = data.getQueryParameter("mode");
         if ("stop".equals(mode)) {
             AzkarReminderScheduler.stop(this);
+            AzkarReminderScheduler.markResult(this, "stopped");
             Toast.makeText(this, R.string.azkar_stopped_toast, Toast.LENGTH_SHORT).show();
-            finish();
+            restartIntoAuthenticatedLauncher();
             return;
         }
         if (!"start".equals(mode)) { finish(); return; }
         pendingInterval = parseInterval(data.getQueryParameter("interval"));
         pendingPhrase = AzkarReminderScheduler.sanitizePhrase(data.getQueryParameter("phrase"));
         pendingText = safePhraseText(pendingPhrase);
-        requestPermissionThenStart();
+        continueActivation();
     }
 
-    private boolean isExpectedBridgeUri(Uri data) { return data != null && "qiblaastro".equals(data.getScheme()) && "azkar-reminder".equals(data.getHost()); }
+    private boolean isExpectedBridgeUri(Uri data) {
+        return data != null && "qiblaastro".equals(data.getScheme()) && "azkar-reminder".equals(data.getHost());
+    }
 
-    private void requestPermissionThenStart() {
+    private void continueActivation() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
+            SharedPreferences p = getSharedPreferences(AzkarReminderScheduler.PREFS, MODE_PRIVATE);
+            if (!p.getBoolean(AzkarReminderScheduler.KEY_NOTIFICATION_ASKED, false)) {
+                p.edit().putBoolean(AzkarReminderScheduler.KEY_NOTIFICATION_ASKED, true).apply();
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
+            } else {
+                openAppNotificationSettings();
+            }
+            return;
+        }
+
+        String issue = AzkarReminderReceiver.channelIssue(this, pendingPhrase);
+        if ("notifications-disabled".equals(issue)) {
+            openAppNotificationSettings();
+            return;
+        }
+        if ("channel-muted".equals(issue)) {
+            openChannelSettings();
+            return;
+        }
+        if (!issue.isEmpty()) {
+            fail(issue);
             return;
         }
         startNativeReminder();
@@ -52,19 +80,85 @@ public final class AzkarReminderActivity extends Activity {
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != REQ_NOTIFICATIONS) return;
-        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) startNativeReminder();
-        else { Toast.makeText(this, R.string.azkar_permission_required, Toast.LENGTH_LONG).show(); finish(); }
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) continueActivation();
+        else fail("notification-denied");
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_NOTIFICATION_SETTINGS) {
+            if (notificationsEnabled()) continueActivation();
+            else fail("notification-denied");
+            return;
+        }
+        if (requestCode == REQ_CHANNEL_SETTINGS) {
+            String issue = AzkarReminderReceiver.channelIssue(this, pendingPhrase);
+            if (issue.isEmpty()) startNativeReminder();
+            else fail(issue);
+        }
+    }
+
+    private boolean notificationsEnabled() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return true;
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        return manager != null && manager.areNotificationsEnabled();
+    }
+
+    private void openAppNotificationSettings() {
+        try {
+            Intent settings = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            startActivityForResult(settings, REQ_NOTIFICATION_SETTINGS);
+        } catch (Exception failure) {
+            fail("notification-denied");
+        }
+    }
+
+    private void openChannelSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            fail("channel-muted");
+            return;
+        }
+        try {
+            Intent settings = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                    .putExtra(Settings.EXTRA_CHANNEL_ID, AzkarReminderReceiver.channelIdForPhrase(pendingPhrase));
+            startActivityForResult(settings, REQ_CHANNEL_SETTINGS);
+        } catch (Exception failure) {
+            fail("channel-muted");
+        }
     }
 
     private void startNativeReminder() {
-        AzkarReminderScheduler.start(this, pendingInterval, pendingPhrase, pendingText);
-        Toast.makeText(this, R.string.azkar_started_toast, Toast.LENGTH_SHORT).show();
+        boolean started = AzkarReminderScheduler.start(this, pendingInterval, pendingPhrase, pendingText);
+        AzkarReminderScheduler.markResult(this, started ? "started" : "scheduler-error");
+        if (started) Toast.makeText(this, R.string.azkar_started_toast, Toast.LENGTH_SHORT).show();
+        restartIntoAuthenticatedLauncher();
+    }
+
+    private void fail(String result) {
+        AzkarReminderScheduler.pauseForIssue(this, result);
+        Toast.makeText(this, R.string.azkar_permission_required, Toast.LENGTH_LONG).show();
+        restartIntoAuthenticatedLauncher();
+    }
+
+    private void restartIntoAuthenticatedLauncher() {
+        Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
+        if (launch != null) {
+            launch.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(launch);
+        }
         finish();
     }
 
     private int parseInterval(String value) {
-        try { int parsed = Integer.parseInt(value); return Math.max(MIN_INTERVAL_MINUTES, Math.min(MAX_INTERVAL_MINUTES, parsed)); }
-        catch (Exception ignored) { return MIN_INTERVAL_MINUTES; }
+        try {
+            int parsed = Integer.parseInt(value);
+            return Math.max(AzkarReminderScheduler.MIN_INTERVAL_MINUTES, Math.min(MAX_INTERVAL_MINUTES, parsed));
+        } catch (Exception ignored) {
+            return AzkarReminderScheduler.DEFAULT_INTERVAL_MINUTES;
+        }
     }
 
     private String safePhraseText(String phrase) {

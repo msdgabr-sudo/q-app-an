@@ -28,8 +28,10 @@ else:
         permissions = {n.get(ANDROID+"name") for n in root.findall("uses-permission") if n.get(ANDROID+"name")}
         for required in ("android.permission.RECEIVE_BOOT_COMPLETED","android.permission.POST_NOTIFICATIONS"):
             if required not in permissions: fail(f"{required} missing from generated manifest")
+        # Azkar itself must not add exact-alarm access. The later prayer-native injection may add
+        # SCHEDULE_EXACT_ALARM for exact prayer-time Adhan, but this isolated Azkar phase must not.
         for forbidden in ("android.permission.SCHEDULE_EXACT_ALARM","android.permission.USE_EXACT_ALARM"):
-            if forbidden in permissions: fail(f"forbidden exact-alarm permission present: {forbidden}")
+            if forbidden in permissions: fail(f"Azkar phase added forbidden exact-alarm permission: {forbidden}")
         app = root.find("application")
         if app is None: fail("application node missing")
         else:
@@ -62,15 +64,15 @@ for set_name in required_sets:
 scheduler=JAVA/"AzkarReminderScheduler.java"
 if scheduler.is_file():
     text=scheduler.read_text(encoding="utf-8")
-    if "MIN_INTERVAL_MINUTES = 5" not in text: fail("scheduler must honor the visible five-minute interval")
-    if "setAndAllowWhileIdle" not in text: fail("scheduler must use setAndAllowWhileIdle")
-    if "setExact" in text or "setExactAndAllowWhileIdle" in text: fail("scheduler must not use exact alarms")
+    for required in ("MIN_INTERVAL_MINUTES = 15","setAndAllowWhileIdle","ELAPSED_REALTIME_WAKEUP","KEY_NEXT_ELAPSED","scheduleNextFromDelivery","restartAfterBoot","restore(Context context)","nextFutureTarget","previousTarget + intervalMs"):
+        if required not in text: fail(f"scheduler contract missing: {required}")
+    if "setExact(" in text or "setExactAndAllowWhileIdle" in text: fail("Azkar scheduler must remain inexact; exact access is reserved for prayer-time Adhan")
     if "PendingIntent.getBroadcast" not in text or "AzkarReminderReceiver.class" not in text: fail("background reminder must target a broadcast receiver independent of the TWA UI")
 
 activity=JAVA/"AzkarReminderActivity.java"
 if activity.is_file():
     text=activity.read_text(encoding="utf-8")
-    for required in ("POST_NOTIFICATIONS","requestPermissions","requestPermissionThenStart","AzkarReminderScheduler.start","AzkarReminderScheduler.stop","isExpectedBridgeUri",'"qiblaastro".equals(data.getScheme())','"azkar-reminder".equals(data.getHost())',"R.string.azkar_permission_required"):
+    for required in ("POST_NOTIFICATIONS","requestPermissions","continueActivation","AzkarReminderScheduler.start","AzkarReminderScheduler.stop","isExpectedBridgeUri",'"qiblaastro".equals(data.getScheme())','"azkar-reminder".equals(data.getHost())',"ACTION_APP_NOTIFICATION_SETTINGS","ACTION_CHANNEL_NOTIFICATION_SETTINGS","restartIntoAuthenticatedLauncher","R.string.azkar_permission_required"):
         if required not in text: fail(f"activity contract missing: {required}")
     if "AlertDialog.Builder" in text: fail("obsolete second confirmation dialog must not return; the visible toggle is the user action")
     if 'getQueryParameter("text")' in text: fail("activity must not trust arbitrary incoming display text")
@@ -78,18 +80,24 @@ if activity.is_file():
 receiver=JAVA/"AzkarReminderReceiver.java"
 if receiver.is_file():
     text=receiver.read_text(encoding="utf-8")
-    for required in ("NotificationChannel","scheduleNext","R.string.azkar_channel_name","R.string.azkar_notification_title","getLaunchIntentForPackage"):
+    for required in ("NotificationChannel","channelIssue","_v2","/raw/","scheduleNextFromDelivery","R.string.azkar_channel_name","R.string.azkar_notification_title","getLaunchIntentForPackage"):
         if required not in text: fail(f"receiver contract missing: {required}")
+    if '"android.resource://" + context.getPackageName() + "/" + rawId' in text: fail("notification channel must not persist a numeric Android resource-ID URI")
     for hardcoded in ('"تنبيهات الأذكار"','"QiblaAstro — تذكير بالذكر"'):
         if hardcoded in text: fail("native notification UI must use Android resources, not hard-coded Arabic")
 
 boot=JAVA/"AzkarBootReceiver.java"
-if boot.is_file() and "scheduleNext" not in boot.read_text(encoding="utf-8"): fail("boot receiver must restore scheduling")
+if boot.is_file():
+    text=boot.read_text(encoding="utf-8")
+    for required in ("restartAfterBoot","restore(context)"):
+        if required not in text: fail(f"boot/update restoration missing: {required}")
 
-print("QiblaAstro — Native Notifications Localization Gate")
-print("="*53)
+print("QiblaAstro — Native Azkar Reminder Gate")
+print("="*45)
 if errors:
     for error in errors: print("ERROR:",error,file=sys.stderr)
     raise SystemExit(1)
 print("PASS: AR/EN/FR/ID/UR resources generated and referenced by native notification UI")
-print("PASS: direct authenticated toggle, Android 13+ permission, broadcast scheduling, reboot and inexact-alarm contracts intact")
+print("PASS: authenticated start/stop handoff + Android notification/channel recovery contract")
+print("PASS: 15-minute minimum + anchored inexact idle-safe local scheduling + reboot/update restoration")
+print("PASS: v2 phrase channels use stable named raw-resource paths and exact alarms remain unused by Azkar")

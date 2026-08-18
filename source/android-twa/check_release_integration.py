@@ -21,6 +21,7 @@ for key,value in [('packageId','com.qiblalabs'),('host','app.qiblalabs.com'),('s
 sw=need(Path('service-worker.js'),'js/presentation/permissions-onboarding.js','service worker')
 for token in ['js/presentation/location-label.js','js/azkar-native-reminders.js','js/presentation/prayer/schedule-sync.js']:
     if token not in sw: errors.append(f"service worker critical cache missing: {token}")
+if 'azkar-native-confirmed-20260818-v1' not in sw: errors.append('service worker confirmed Azkar release marker missing')
 if 'widget-sync.js' in sw: errors.append('disabled widget deep-link sync must not be in the critical cache')
 
 permissions=need(Path('js/presentation/permissions-onboarding.js'),'requestWebNotifications','permissions onboarding')
@@ -36,14 +37,25 @@ for forbidden in ['apply_native_permissions.ps1','apply_native_widget.ps1','chec
     if forbidden in apply: errors.append(f"release orchestrator must not inject disabled exported bridge: {forbidden}")
 
 azkar=need(Path('android-twa/native/azkar-reminders/AzkarReminderActivity.java'),'NativeBridgeToken.valid','Azkar native bridge')
-for required in ['isExpectedBridgeUri','MAX_INTERVAL_MINUTES','safePhraseText','requestPermissionThenStart','AzkarReminderScheduler.stop(this)']:
+for required in ['isExpectedBridgeUri','MAX_INTERVAL_MINUTES','safePhraseText','continueActivation','ACTION_APP_NOTIFICATION_SETTINGS','ACTION_CHANNEL_NOTIFICATION_SETTINGS','restartIntoAuthenticatedLauncher','AzkarReminderScheduler.stop(this)']:
     if required not in azkar: errors.append(f"Azkar bridge hardening missing: {required}")
 if 'getQueryParameter("text")' in azkar: errors.append('Azkar bridge must not trust arbitrary incoming display text')
 
+azscheduler=need(Path('android-twa/native/azkar-reminders/AzkarReminderScheduler.java'),'MIN_INTERVAL_MINUTES = 15','Azkar scheduler')
+for required in ['setAndAllowWhileIdle','ELAPSED_REALTIME_WAKEUP','KEY_NEXT_ELAPSED','nextFutureTarget','previousTarget + intervalMs']:
+    if required not in azscheduler: errors.append(f"Azkar scheduler missing contract: {required}")
+for forbidden in ['setExact(','setExactAndAllowWhileIdle']:
+    if forbidden in azscheduler: errors.append(f"Azkar reminders must remain inexact: {forbidden}")
+
+azreceiver=need(Path('android-twa/native/azkar-reminders/AzkarReminderReceiver.java'),'channelIssue','Azkar notification receiver')
+for required in ['_v2','/raw/','scheduleNextFromDelivery']:
+    if required not in azreceiver: errors.append(f"Azkar notification receiver missing contract: {required}")
+
 azweb=need(Path('js/azkar-native-reminders.js'),'qiblaastro://azkar-reminder?','Azkar web/native bridge')
-for required in ['topWin.location.href=uri','intent://azkar-reminder?','category=android.intent.category.BROWSABLE','tokenFromStorage']:
-    if required not in azweb: errors.append(f"Azkar web bridge missing browser-launch contract: {required}")
+for required in ['topWin.location.href=uri','intent://azkar-reminder?','category=android.intent.category.BROWSABLE','tokenFromStorage','MIN_INTERVAL=15','nativeAzkar','azkarResult','azkarIssue','enforceMinimumInterval','HANDOFF_TIMEOUT_MS=10000']:
+    if required not in azweb: errors.append(f"Azkar web bridge missing confirmed-state contract: {required}")
 if 'a.click()' in azweb: errors.append('Azkar web bridge must not rely on a synthetic anchor click for native launch')
+if "qiblaastro:native-azkar-reminder:v1" in azweb: errors.append('legacy Web localStorage must not remain Native Azkar source of truth')
 azhost=need(Path('js/presentation/azkar/host.js'),"TOKEN_KEY='qiblaastro:native-token'",'Azkar iframe host')
 for required in ["'?twa=1'","'#nativeToken='+encodeURIComponent(token)",'seedFrameContext(frame)']:
     if required not in azhost: errors.append(f"Azkar iframe native context propagation missing: {required}")
@@ -68,6 +80,7 @@ if errors:
     print(f'FAILED: {len(errors)} integration issue(s)',file=sys.stderr)
     raise SystemExit(1)
 print('PASS: TWA identity, city label, permissions onboarding and service-worker cache are consistent')
-print('PASS: Azkar iframe propagates authenticated TWA context and uses direct custom-scheme navigation from the user gesture')
+print('PASS: Azkar iframe propagates authenticated TWA context; Android confirms start/stop and enforces a 15-minute inexact reminder floor')
+print('PASS: Azkar notification/channel recovery and stable local audio contract are release-gated')
 print('PASS: Prayer UI synchronously hands the authenticated dated schedule to the published native prayer component from a user gesture')
 print('PASS: exported widget-data and standalone notification-permission custom-scheme bridges are absent')
