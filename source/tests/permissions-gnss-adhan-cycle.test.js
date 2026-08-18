@@ -63,7 +63,10 @@ assert(nativeScheduler.includes('am.setExactAndAllowWhileIdle(AlarmManager.RTC_W
 assert(nativeScheduler.includes('if(pre)')&&nativeScheduler.includes('am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);'),'pre-prayer reminder must remain separately inexact');
 assert(nativeScheduler.includes('KEY_NATIVE_ACTIVE'));
 assert(nativeScheduler.includes('p.edit().putBoolean(KEY_NATIVE_ACTIVE,false)'),'revoked exact access must remove confirmed native ownership');
-assert(nativeReceiver.includes('USAGE_ALARM')&&nativeReceiver.includes('rawForAdhan'));
+assert(nativeScheduler.includes('scheduledPrayerCount>0'),'an exhausted dated plan must fail closed instead of retaining native ownership');
+assert(nativeReceiver.includes('USAGE_ALARM')&&nativeReceiver.includes('rawNameForAdhan'));
+assert(nativeReceiver.includes('"/raw/"+rawName'),'Adhan notification sound must use a stable named raw-resource URI');
+assert(nativeReceiver.includes('_v2'),'code4 must create fresh prayer notification channels');
 assert(nativeBoot.includes('ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED'),'granting exact-alarm access must trigger native rescheduling');
 assert(applyNative.includes('android.permission.SCHEDULE_EXACT_ALARM'));
 assert(applyNative.includes('ACTION_REQUEST_SCHEDULE_EXACT_ALARM'));
