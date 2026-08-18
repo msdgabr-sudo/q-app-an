@@ -5,6 +5,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 
 import java.util.Calendar;
 import java.util.TimeZone;
@@ -13,24 +14,47 @@ public final class PrayerNativeScheduler {
     public static final String PREFS = "qiblaastro_prayer_native";
     public static final String[] IDS = {"fajr","dhuhr","asr","maghrib","isha"};
     static final String KEY_PLAN = "plan_v1";
+    static final String KEY_NATIVE_ACTIVE = "native_active_v1";
     static final int BASE_REQ = 8400;
     static final int PRE_REQ = 8450;
     private PrayerNativeScheduler() {}
 
-    public static void reschedule(Context context) {
+    public static boolean canScheduleExactAlarms(Context context) {
+        AlarmManager am=(AlarmManager)context.getSystemService(Context.ALARM_SERVICE);
+        if(am==null)return false;
+        return Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms();
+    }
+
+    public static boolean nativeActive(Context context) {
+        SharedPreferences p=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);
+        if(!p.getBoolean("enabled",false) || !p.getBoolean(KEY_NATIVE_ACTIVE,false))return false;
+        return canScheduleExactAlarms(context);
+    }
+
+    public static boolean reschedule(Context context) {
         cancelAll(context);
         SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        if (!p.getBoolean("enabled", false)) return;
+        if (!p.getBoolean("enabled", false)) {
+            p.edit().putBoolean(KEY_NATIVE_ACTIVE,false).apply();
+            return true;
+        }
+        if (!canScheduleExactAlarms(context)) {
+            p.edit().putBoolean(KEY_NATIVE_ACTIVE,false).apply();
+            return false;
+        }
         String tzId = p.getString("timezone", TimeZone.getDefault().getID());
         TimeZone tz = TimeZone.getTimeZone(tzId == null ? TimeZone.getDefault().getID() : tzId);
         long now = System.currentTimeMillis();
         int advance = Math.max(0, Math.min(30, p.getInt("advance", 0)));
         String plan = p.getString(KEY_PLAN, "");
         boolean dateStamped = plan != null && !plan.isEmpty();
+        boolean hasEnabledPrayer=false;
+        boolean scheduled=true;
         for (int i=0;i<IDS.length;i++) {
             String id = IDS[i];
             String mode = p.getString("mode_"+id, "off");
             if ("off".equals(mode)) continue;
+            hasEnabledPrayer=true;
             long actual;
             if (dateStamped) {
                 actual = nextPlannedOccurrence(plan, i, now, tz);
@@ -40,12 +64,15 @@ public final class PrayerNativeScheduler {
                 if (minute < 0 || minute >= 1440) continue;
                 actual = nextOccurrence(now, minute, tz);
             }
-            scheduleOne(context, BASE_REQ+i, id, mode, false, actual);
+            if(!scheduleOne(context, BASE_REQ+i, id, mode, false, actual))scheduled=false;
             if (advance > 0) {
                 long pre = actual - advance*60_000L;
-                if (pre > now + 5000L) scheduleOne(context, PRE_REQ+i, id, "notification", true, pre);
+                if (pre > now + 5000L && !scheduleOne(context, PRE_REQ+i, id, "notification", true, pre))scheduled=false;
             }
         }
+        boolean active=hasEnabledPrayer&&scheduled;
+        p.edit().putBoolean(KEY_NATIVE_ACTIVE,active).apply();
+        return active;
     }
 
     private static long nextPlannedOccurrence(String plan, int prayerIndex, long now, TimeZone tz) {
@@ -85,14 +112,26 @@ public final class PrayerNativeScheduler {
         return c.getTimeInMillis();
     }
 
-    private static void scheduleOne(Context context, int requestCode, String id, String mode, boolean pre, long at) {
+    private static boolean scheduleOne(Context context, int requestCode, String id, String mode, boolean pre, long at) {
         AlarmManager am=(AlarmManager)context.getSystemService(Context.ALARM_SERVICE);
-        if(am==null)return;
+        if(am==null)return false;
         Intent in=new Intent(context, PrayerNotificationReceiver.class)
                 .setAction("com.qiblalabs.PRAYER_NATIVE_"+(pre?"PRE_":"")+id)
                 .putExtra("prayer",id).putExtra("mode",mode).putExtra("pre",pre);
         PendingIntent pi=PendingIntent.getBroadcast(context,requestCode,in,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);
+        try {
+            if(pre){
+                // A pre-prayer reminder is informational and may be batched. Keeping it
+                // inexact also avoids Android's idle exact-alarm rate limit interfering
+                // with the exact prayer-time Adhan a few minutes later.
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);
+            }else{
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,pi);
+            }
+            return true;
+        } catch (SecurityException denied) {
+            return false;
+        }
     }
 
     public static void cancelAll(Context context) {
