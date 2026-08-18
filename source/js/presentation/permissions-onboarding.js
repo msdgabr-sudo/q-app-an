@@ -11,6 +11,9 @@
 var STORAGE_KEY='qiblaastro:permissions-onboarding:v2';
 var mounted=false;
 var astroGuardBusy=false;
+var gnssRecoveryTimer=null;
+var gnssRecoveryAttempt=0;
+var GNSS_RECOVERY_DELAYS=[13000,17000,25000];
 
 function isTwaSurface(){
   try{
@@ -31,6 +34,39 @@ function readState(){try{return JSON.parse(root.localStorage.getItem(STORAGE_KEY
 function writeState(value){try{root.localStorage.setItem(STORAGE_KEY,JSON.stringify(value));}catch(_){ }}
 function permissionLabel(value){return value==='granted'?'مسموح':value==='denied'?'مرفوض':value==='unsupported'?'عند الحاجة':value==='unavailable'?'الموقع غير متاح':'بانتظار الموافقة';}
 function permissionClass(value){return value==='granted'||value==='unsupported'?'ok':value==='denied'?'bad':'wait';}
+
+function trustedGnssReady(){
+  try{
+    return typeof gnssHasTrustedFix!=='undefined'&&gnssHasTrustedFix===true&&
+      typeof gnssSource!=='undefined'&&gnssSource==='gps'&&
+      typeof LAT!=='undefined'&&typeof LON!=='undefined'&&
+      Number.isFinite(Number(LAT))&&Number.isFinite(Number(LON));
+  }catch(_){return false;}
+}
+function trustedGnssBusy(){try{return typeof gnssUpdating!=='undefined'&&gnssUpdating===true;}catch(_){return false;}}
+function clearGnssRecovery(){if(gnssRecoveryTimer!==null){try{root.clearTimeout(gnssRecoveryTimer);}catch(_){}gnssRecoveryTimer=null;}}
+function scheduleGnssRecovery(){
+  if(trustedGnssReady()){clearGnssRecovery();gnssRecoveryAttempt=0;return;}
+  if(gnssRecoveryTimer!==null||gnssRecoveryAttempt>=GNSS_RECOVERY_DELAYS.length)return;
+  var delay=GNSS_RECOVERY_DELAYS[gnssRecoveryAttempt++];
+  gnssRecoveryTimer=root.setTimeout(function(){gnssRecoveryTimer=null;recoverTrustedGnss(false);},delay);
+}
+async function recoverTrustedGnss(reset){
+  if(!isAppSurface())return false;
+  if(reset){clearGnssRecovery();gnssRecoveryAttempt=0;}
+  if(trustedGnssReady()){clearGnssRecovery();gnssRecoveryAttempt=0;return true;}
+  var permission=await queryLocationPermission();
+  if(permission==='unknown'){
+    var saved=readState();
+    if(saved&&saved.completed&&saved.location==='granted')permission='granted';
+  }
+  if(permission!=='granted')return false;
+  if(!trustedGnssBusy()&&typeof root.tryBrowserGPS==='function'){
+    try{root.tryBrowserGPS();}catch(_){ }
+  }
+  scheduleGnssRecovery();
+  return true;
+}
 
 function ensureStyle(){
   if(!root.document||root.document.getElementById('qa-permission-style'))return;
@@ -104,6 +140,7 @@ async function runPermissionRequest(){
        settled, ask the existing trusted GNSS path for a fresh device position. */
     if(locationResult==='granted'&&typeof root.tryBrowserGPS==='function'){
       root.setTimeout(function(){try{root.tryBrowserGPS();}catch(_){ }},0);
+      root.setTimeout(function(){recoverTrustedGnss(true);},250);
     }
     root.setTimeout(function(){closeOverlay(false);toast('تم اعتماد صلاحية الموقع. سيُحدَّث GPS/GNSS من الجهاز، والإشعارات تُطلب فقط عند تشغيل تنبيه يحتاجها.');},350);
     return;
@@ -155,7 +192,14 @@ async function handleAstroClick(event){
   finally{astroGuardBusy=false;target.disabled=false;if(label&&old)label.textContent=old;}
 }
 function installAstroCameraGuard(){if(!root.document||root.document.__qaAstroCameraPermissionGuard)return;root.document.__qaAstroCameraPermissionGuard=true;root.document.addEventListener('click',handleAstroClick,true);}
-function start(){installAstroCameraGuard();if(isAppSurface())root.setTimeout(function(){mountOnboarding(false);},1400);}
+function start(){
+  installAstroCameraGuard();
+  if(!isAppSurface())return;
+  root.setTimeout(function(){recoverTrustedGnss(true);},100);
+  root.setTimeout(function(){mountOnboarding(false);},1400);
+  root.addEventListener('focus',function(){recoverTrustedGnss(true);});
+  root.document.addEventListener('visibilitychange',function(){if(!root.document.hidden)recoverTrustedGnss(true);});
+}
 
 root.QiblaPermissions=Object.freeze({showOnboarding:function(){mountOnboarding(true);},ensureCameraForVerification:ensureCameraPermission,isAppSurface:isAppSurface,getState:readState,requestNotifications:requestWebNotifications});
 if(root.document){if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',start,{once:true});else start();}
