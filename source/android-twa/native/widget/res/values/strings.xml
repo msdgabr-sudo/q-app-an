@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_app_name">QiblaAstro</string>
+    <string name="widget_description">مواقيت الصلاة والقبلة في لمحة</string>
     <string name="widget_city_unavailable">افتح التطبيق لتحديد المدينة</string>
+    <string name="widget_location_unavailable_short">الموقع غير محدد</string>
     <string name="widget_refresh_required">افتح التطبيق للتحديث</string>
     <string name="widget_value_unavailable">—</string>
+    <string name="widget_next_prayer_label">الصلاة القادمة</string>
+    <string name="widget_qibla_label">اتجاه القبلة</string>
+    <string name="widget_true_north">من الشمال الحقيقي</string>
     <string name="widget_qibla_unavailable">القبلة —</string>
     <string name="widget_qibla_value">القبلة %1$s°</string>
+    <string name="widget_qibla_degrees">%1$s°</string>
+    <string name="widget_updated_value">آخر تحديث %1$s</string>
 </resources>

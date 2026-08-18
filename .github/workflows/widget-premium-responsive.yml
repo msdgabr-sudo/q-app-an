@@ -1,0 +1,35 @@
+name: Premium responsive widget
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'source/android-twa/native/widget/**'
+      - 'source/android-twa/apply_native_widget.ps1'
+      - 'source/tests/widget-premium-responsive.test.js'
+      - '.github/workflows/widget-premium-responsive.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'source/android-twa/native/widget/**'
+      - 'source/android-twa/apply_native_widget.ps1'
+      - 'source/tests/widget-premium-responsive.test.js'
+      - '.github/workflows/widget-premium-responsive.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  widget-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: source
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify responsive widget design contract
+        run: node tests/widget-premium-responsive.test.js

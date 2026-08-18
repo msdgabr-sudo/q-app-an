@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="9dp"
+    android:layoutDirection="locale"
+    android:background="@drawable/qibla_widget_bg">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_app_name"
+        android:textStyle="bold"
+        android:textSize="12sp"
+        android:textColor="#F0CF82"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/widget_city"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:text="@string/widget_location_unavailable_short"
+        android:textSize="8sp"
+        android:textColor="#8EA2B7"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="5dp"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingStart="9dp"
+        android:paddingEnd="9dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:background="@drawable/qibla_widget_panel">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_next_prayer_label"
+            android:textSize="7sp"
+            android:textColor="#8EA2B7" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <TextView
+                android:id="@+id/widget_next_prayer"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/widget_refresh_required"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:textColor="#FFFFFF"
+                android:maxLines="1" />
+
+            <TextView
+                android:id="@+id/widget_prayer_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_value_unavailable"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="#72E59E"
+                android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:baselineAligned="false">
+
+        <TextView
+            android:id="@+id/widget_hijri"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/widget_value_unavailable"
+            android:textSize="7sp"
+            android:textColor="#7D91A6"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/widget_qibla"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_qibla_unavailable"
+            android:textStyle="bold"
+            android:textSize="11sp"
+            android:textColor="#F0C56A"
+            android:maxLines="1" />
+    </LinearLayout>
+</LinearLayout>
