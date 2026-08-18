@@ -48,6 +48,7 @@ assert(nav.includes("&&gnssHasTrustedFix){updateQiblaFromPosition();}"),'Navigat
 for(const forbidden of ['calcQibla(','refreshMdeclFromTrustedGnss(','calcPrayers(','sunPos(','moonPos(','AstroVerification']){
   assert(!permissions.includes(forbidden),`Permissions integration must not touch protected calculation token: ${forbidden}`);
 }
+assert(bootstrap.includes("css/compass-confidence-final.css?v=20260809-reference-ui1"),'Adhan permission-cycle work must not alter the existing compass confidence asset contract');
 
 // Prayer runtime remains the only owner of prayer calculations. Native bridge boot is independent of prayer presentation mounting.
 assert(runtime.includes('QiblaPrayerMethods.calculate'),'Prayer runtime must retain the approved prayer calculation engine');
