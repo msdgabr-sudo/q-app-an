@@ -34,8 +34,13 @@ assert(/function\s+tryIPGeo\s*\(\)/.test(gnss),'compatibility alias may remain')
 const permissions=fs.readFileSync('js/presentation/permissions-onboarding.js','utf8');
 assert(/function\s+queryLocationPermission\s*\(/.test(permissions),'onboarding must inspect the browser/TWA geolocation permission state');
 assert(/if\(err&&err\.code===1\)\{finish\('denied'\)/.test(permissions),'only PERMISSION_DENIED may classify location permission as denied');
-assert(/finish\('granted'\);\s*\n\s*\}/.test(permissions),'position timeout/unavailable must not be confused with a denied permission');
-assert(/var\s+notificationResult=currentWebNotificationState\(\)/.test(permissions),'first-run onboarding must not launch a competing notification prompt');
+assert(/if\(err&&err\.code===1\)\{finish\('denied'\);return;\}[\s\S]*settleFromPermission\(\)/.test(permissions),'position timeout/unavailable must resolve from permission state instead of being classified as denied');
+const permissionFlowStart=permissions.indexOf('async function runPermissionRequest()');
+const permissionFlowEnd=permissions.indexOf('function mountOnboarding',permissionFlowStart);
+assert(permissionFlowStart>=0&&permissionFlowEnd>permissionFlowStart,'first-run permission flow block missing');
+const permissionFlow=permissions.slice(permissionFlowStart,permissionFlowEnd);
+assert(permissionFlow.includes("setState('notifications','contextual')"),'first-run notification state must remain contextual until Native Adhan activation');
+assert(!permissionFlow.includes('requestWebNotifications()'),'first-run onboarding must not launch a competing Web notification prompt');
 assert(!/var\s+notificationPromise=requestWebNotifications\(\)/.test(permissions),'legacy concurrent notification/location permission request must remain removed');
 assert(/typeof\s+root\.tryBrowserGPS===['\"]function['\"]/.test(permissions),'successful permission onboarding must hand off to the existing trusted GNSS path');
 
