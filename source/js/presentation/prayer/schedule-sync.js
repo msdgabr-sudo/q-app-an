@@ -3,7 +3,7 @@
 'use strict';
 var lastKey='',timer=0,TOKEN_KEY='qiblaastro:native-token',AUTO_KEY='qiblaastro:prayer-native-sync-enabled:v1',OWNER_KEY='qiblaastro:prayer-native-owner:v1',LAST_SYNC_KEY='qiblaastro:prayer-native-sync-last:v1',PERMISSION_STATE_KEY='qiblaastro:permissions-onboarding:v2',HANDOFF_TIMEOUT_MS=120000,PLAN_DAYS=180;
 function isTwa(){try{var q=new URLSearchParams(root.location.search||'');return q.get('twa')==='1'||root.sessionStorage.getItem('qiblaastro:twa')==='1';}catch(_){return false;}}
-function localAdhanEnabled(){try{var api=root.QiblaAdhanUI,st=api&&typeof api.getState==='function'?api.getState():null;return !!(st&&st.enabled);}catch(_){return false;}}
+function localAdhanEnabled(){try{var api=root.QiblaAdhanUI,st=api&&typeof api.getState==='function'?api.getState():null;if(!st||!st.enabled)return false;var prayers=st.prayers||{};return Object.keys(prayers).some(function(name){return prayers[name]&&prayers[name]!=='off';});}catch(_){return false;}}
 function permissionState(){try{return JSON.parse(root.localStorage.getItem(PERMISSION_STATE_KEY)||'{}')||{};}catch(_){return {};}}
 function writePermissionState(saved){try{root.localStorage.setItem(PERMISSION_STATE_KEY,JSON.stringify(saved||{}));}catch(_){}}
 function setOwner(active){
