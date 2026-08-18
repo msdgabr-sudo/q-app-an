@@ -2,9 +2,9 @@
  * Presentation/integration only. Does not calculate or modify Qibla, GNSS,
  * astronomy, camera solving or verification results.
  *
- * Security note: this file deliberately does not use a custom-scheme bridge for
- * notification permission. Native POST_NOTIFICATIONS is requested by the native
- * Azkar reminder flow only when the user explicitly enables that feature.
+ * Location permission, trusted GNSS acquisition and native Adhan activation are
+ * intentionally separate states. The existing production GNSS/prayer engines
+ * remain the only owners of coordinates and prayer-time calculations.
  */
 (function(root){
 'use strict';
@@ -13,7 +13,10 @@ var mounted=false;
 var astroGuardBusy=false;
 var gnssRecoveryTimer=null;
 var gnssRecoveryAttempt=0;
+var adhanPrepareTimer=null;
+var adhanPrepareStartedAt=0;
 var GNSS_RECOVERY_DELAYS=[13000,17000,25000];
+var ADHAN_PREPARE_TIMEOUT=20000;
 
 function isTwaSurface(){
   try{
@@ -32,8 +35,19 @@ function isAppSurface(){
 }
 function readState(){try{return JSON.parse(root.localStorage.getItem(STORAGE_KEY)||'null');}catch(_){return null;}}
 function writeState(value){try{root.localStorage.setItem(STORAGE_KEY,JSON.stringify(value));}catch(_){ }}
-function permissionLabel(value){return value==='granted'?'مسموح':value==='denied'?'مرفوض':value==='unsupported'?'عند الحاجة':value==='unavailable'?'الموقع غير متاح':'بانتظار الموافقة';}
-function permissionClass(value){return value==='granted'||value==='unsupported'?'ok':value==='denied'?'bad':'wait';}
+function mergeState(patch){var current=readState()||{};Object.keys(patch||{}).forEach(function(k){current[k]=patch[k];});writeState(current);return current;}
+function permissionLabel(value){
+  if(value==='granted')return 'مسموح';
+  if(value==='denied')return 'مرفوض';
+  if(value==='unsupported')return 'عند الحاجة';
+  if(value==='unavailable')return 'غير متاح';
+  if(value==='ready')return 'جاهز للتفعيل';
+  if(value==='requested')return 'طلب Android';
+  if(value==='contextual')return 'مع تفعيل الأذان';
+  if(value==='locating')return 'جاري تحديد الموقع';
+  return 'بانتظار الموافقة';
+}
+function permissionClass(value){return value==='granted'||value==='unsupported'||value==='ready'||value==='requested'?'ok':value==='denied'||value==='unavailable'?'bad':'wait';}
 
 function trustedGnssReady(){
   try{
@@ -44,6 +58,23 @@ function trustedGnssReady(){
   }catch(_){return false;}
 }
 function trustedGnssBusy(){try{return typeof gnssUpdating!=='undefined'&&gnssUpdating===true;}catch(_){return false;}}
+function prayerRuntimeReady(){
+  try{
+    if(root.QiblaTrustedLocationRuntimeSync&&typeof root.QiblaTrustedLocationRuntimeSync.getState==='function'){
+      var st=root.QiblaTrustedLocationRuntimeSync.getState();
+      if(st&&st.ok===true)return true;
+    }
+  }catch(_){ }
+  try{
+    if(typeof pCache!=='undefined'&&Array.isArray(pCache)){
+      var names={'الفجر':1,'الظهر':1,'العصر':1,'المغرب':1,'العشاء':1},count=0;
+      pCache.forEach(function(p){if(p&&names[p.n]&&Number.isFinite(Number(p.h)))count++;});
+      return count===5;
+    }
+  }catch(_){ }
+  return false;
+}
+function nativePrayerBridgeReady(){return !!(root.QiblaPrayerNativeSync&&typeof root.QiblaPrayerNativeSync.sync==='function');}
 function clearGnssRecovery(){if(gnssRecoveryTimer!==null){try{root.clearTimeout(gnssRecoveryTimer);}catch(_){}gnssRecoveryTimer=null;}}
 function scheduleGnssRecovery(){
   if(trustedGnssReady()){clearGnssRecovery();gnssRecoveryAttempt=0;return;}
@@ -56,9 +87,9 @@ async function recoverTrustedGnss(reset){
   if(reset){clearGnssRecovery();gnssRecoveryAttempt=0;}
   if(trustedGnssReady()){clearGnssRecovery();gnssRecoveryAttempt=0;return true;}
   var permission=await queryLocationPermission();
-  if(permission==='unknown'){
+  if(permission==='unknown'||permission==='prompt'){
     var saved=readState();
-    if(saved&&saved.completed&&saved.location==='granted')permission='granted';
+    if(saved&&saved.location==='granted')permission='granted';
   }
   if(permission!=='granted')return false;
   if(!trustedGnssBusy()&&typeof root.tryBrowserGPS==='function'){
@@ -71,50 +102,49 @@ async function recoverTrustedGnss(reset){
 function ensureStyle(){
   if(!root.document||root.document.getElementById('qa-permission-style'))return;
   var s=root.document.createElement('style');s.id='qa-permission-style';
-  s.textContent='.qa-permission-overlay{position:fixed;inset:0;z-index:2147483000;background:rgba(2,6,12,.88);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl}.qa-permission-card{width:min(430px,100%);background:linear-gradient(180deg,#0d1828,#07111d);border:1px solid rgba(200,164,74,.34);border-radius:24px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.55);color:#f4f7fb;font-family:inherit}.qa-permission-card h2{font-size:1.2rem;margin:0 0 8px;color:#e8c878}.qa-permission-card>p{font-size:.78rem;line-height:1.85;color:#afc0d6;margin:0 0 16px}.qa-permission-item{display:flex;gap:12px;align-items:flex-start;padding:12px;margin:8px 0;border-radius:15px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)}.qa-permission-item .ico{font-size:1.4rem}.qa-permission-item b{display:block;font-size:.84rem;margin-bottom:3px}.qa-permission-item small{display:block;color:#8197b2;line-height:1.65;font-size:.68rem}.qa-permission-state{margin-inline-start:auto;font-size:.62rem;padding:4px 8px;border-radius:999px;white-space:nowrap}.qa-permission-state.ok{color:#86e8ae;background:rgba(58,180,105,.14)}.qa-permission-state.bad{color:#ff9b9b;background:rgba(210,70,70,.14)}.qa-permission-state.wait{color:#a9bfd9;background:rgba(120,150,190,.12)}.qa-permission-actions{display:flex;gap:9px;margin-top:17px}.qa-permission-actions button{flex:1;border:0;border-radius:13px;padding:12px 10px;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer}.qa-permission-primary{background:#d3aa43;color:#09111d}.qa-permission-secondary{background:rgba(255,255,255,.07);color:#d9e3ef;border:1px solid rgba(255,255,255,.12)!important}.qa-permission-note{display:block;margin-top:12px;font-size:.62rem;line-height:1.7;color:#7389a4}.qa-permission-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483001;background:#101b2a;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px 14px;font:600 .76rem/1.5 inherit;box-shadow:0 12px 35px rgba(0,0,0,.45);max-width:min(90vw,420px);text-align:center;direction:rtl}';
+  s.textContent='.qa-permission-overlay{position:fixed;inset:0;z-index:2147483000;background:rgba(2,6,12,.88);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl}.qa-permission-card{width:min(430px,100%);background:linear-gradient(180deg,#0d1828,#07111d);border:1px solid rgba(200,164,74,.34);border-radius:24px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.55);color:#f4f7fb;font-family:inherit}.qa-permission-card h2{font-size:1.2rem;margin:0 0 8px;color:#e8c878}.qa-permission-card>p{font-size:.78rem;line-height:1.85;color:#afc0d6;margin:0 0 16px}.qa-permission-item{display:flex;gap:12px;align-items:flex-start;padding:12px;margin:8px 0;border-radius:15px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)}.qa-permission-item .ico{font-size:1.4rem}.qa-permission-item b{display:block;font-size:.84rem;margin-bottom:3px}.qa-permission-item small{display:block;color:#8197b2;line-height:1.65;font-size:.68rem}.qa-permission-state{margin-inline-start:auto;font-size:.62rem;padding:4px 8px;border-radius:999px;white-space:nowrap}.qa-permission-state.ok{color:#86e8ae;background:rgba(58,180,105,.14)}.qa-permission-state.bad{color:#ff9b9b;background:rgba(210,70,70,.14)}.qa-permission-state.wait{color:#a9bfd9;background:rgba(120,150,190,.12)}.qa-permission-actions{display:flex;gap:9px;margin-top:17px}.qa-permission-actions button{flex:1;border:0;border-radius:13px;padding:12px 10px;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer}.qa-permission-actions button:disabled{opacity:.72;cursor:wait}.qa-permission-primary{background:#d3aa43;color:#09111d}.qa-permission-secondary{background:rgba(255,255,255,.07);color:#d9e3ef;border:1px solid rgba(255,255,255,.12)!important}.qa-permission-note{display:block;margin-top:12px;font-size:.62rem;line-height:1.7;color:#7389a4}.qa-permission-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483001;background:#101b2a;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:10px 14px;font:600 .76rem/1.5 inherit;box-shadow:0 12px 35px rgba(0,0,0,.45);max-width:min(90vw,420px);text-align:center;direction:rtl}';
   (root.document.head||root.document.documentElement).appendChild(s);
 }
 function toast(text){
   ensureStyle();var old=root.document.getElementById('qa-permission-toast');if(old)old.remove();
   var n=root.document.createElement('div');n.id='qa-permission-toast';n.className='qa-permission-toast';n.textContent=text;root.document.body.appendChild(n);root.setTimeout(function(){if(n&&n.parentNode)n.remove();},4200);
 }
-async function queryLocationPermission(){
+async function getLocationPermissionStatus(){
   try{
-    if(!root.navigator.permissions||typeof root.navigator.permissions.query!=='function')return 'unknown';
-    var status=await root.navigator.permissions.query({name:'geolocation'});
-    return status&&status.state?status.state:'unknown';
-  }catch(_){return 'unknown';}
+    if(!root.navigator.permissions||typeof root.navigator.permissions.query!=='function')return null;
+    return await root.navigator.permissions.query({name:'geolocation'});
+  }catch(_){return null;}
 }
+async function queryLocationPermission(){var status=await getLocationPermissionStatus();return status&&status.state?status.state:'unknown';}
 async function requestLocation(){
   if(!root.navigator.geolocation)return 'unsupported';
-  var existing=await queryLocationPermission();
-  if(existing==='granted'||existing==='denied')return existing;
+  var status=await getLocationPermissionStatus();
+  if(status&&status.state==='granted')return 'granted';
+  if(status&&status.state==='denied')return 'denied';
   return new Promise(function(resolve){
-    var done=false;function finish(v){if(done)return;done=true;resolve(v);}
+    var done=false,timer=null;
+    function cleanup(){if(timer!==null){root.clearTimeout(timer);timer=null;}try{if(status)status.onchange=null;}catch(_){ }}
+    function finish(v){if(done)return;done=true;cleanup();resolve(v);}
+    async function settleFromPermission(){
+      var p=await queryLocationPermission();
+      if(p==='granted'||p==='denied')finish(p);else finish('prompt');
+    }
+    if(status){status.onchange=function(){if(status.state==='granted'||status.state==='denied')finish(status.state);};}
+    timer=root.setTimeout(settleFromPermission,10000);
     try{
       root.navigator.geolocation.getCurrentPosition(
         function(){finish('granted');},
         function(err){
-          /* PERMISSION_DENIED is the only geolocation error that means the user
-             did not grant location. POSITION_UNAVAILABLE and TIMEOUT mean the
-             permission request was allowed but a position fix was not available
-             yet; they must not trap first-run onboarding in a permission loop. */
           if(err&&err.code===1){finish('denied');return;}
-          finish('granted');
+          /* A slow or temporarily unavailable fix is not a permission denial.
+             Resolve from the permission state and let the existing trusted GNSS
+             lifecycle acquire the high-accuracy fresh fix separately. */
+          settleFromPermission();
         },
-        {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+        {enableHighAccuracy:false,timeout:8000,maximumAge:60000}
       );
     }catch(_){finish('unavailable');}
   });
-}
-function currentWebNotificationState(){
-  try{
-    if(!('Notification' in root))return 'unsupported';
-    if(root.Notification.permission==='granted'||root.Notification.permission==='denied')return root.Notification.permission;
-  }catch(_){ }
-  /* Notifications are contextual in the Android app. Do not compete with the
-     location prompt during first-run onboarding. */
-  return 'unsupported';
 }
 function requestWebNotifications(){
   try{
@@ -125,29 +155,76 @@ function requestWebNotifications(){
 }
 function stateNode(name){return root.document.querySelector('[data-qa-permission-state="'+name+'"]');}
 function setState(name,value){var n=stateNode(name);if(!n)return;n.textContent=permissionLabel(value);n.className='qa-permission-state '+permissionClass(value);}
-function closeOverlay(markDone){var n=root.document.getElementById('qa-permission-overlay');if(n)n.remove();if(markDone)writeState({completed:true,completedAt:Date.now()});}
-
-async function runPermissionRequest(){
-  var btn=root.document.getElementById('qa-permission-allow');if(btn){btn.disabled=true;btn.textContent='جاري طلب صلاحية الموقع...';}
-  /* Location is the only first-run permission request. Android notification
-     permission remains contextual and is requested by the native reminder flow. */
-  var notificationResult=currentWebNotificationState();setState('notifications',notificationResult);
-  var locationResult=await requestLocation();setState('location',locationResult);
-  var acceptedLocation=locationResult==='granted'||locationResult==='unsupported';
-  if(acceptedLocation){
-    writeState({completed:true,location:locationResult,notifications:notificationResult,twa:isTwaSurface(),completedAt:Date.now()});
-    /* Permission success and GNSS fix are separate states. Once permission is
-       settled, ask the existing trusted GNSS path for a fresh device position. */
-    if(locationResult==='granted'&&typeof root.tryBrowserGPS==='function'){
-      root.setTimeout(function(){try{root.tryBrowserGPS();}catch(_){ }},0);
-      root.setTimeout(function(){recoverTrustedGnss(true);},250);
-    }
-    root.setTimeout(function(){closeOverlay(false);toast('تم اعتماد صلاحية الموقع. سيُحدَّث GPS/GNSS من الجهاز، والإشعارات تُطلب فقط عند تشغيل تنبيه يحتاجها.');},350);
+function note(text){var n=root.document.getElementById('qa-permission-note');if(n)n.textContent=text||'';}
+function primaryButton(){return root.document.getElementById('qa-permission-allow');}
+function closeOverlay(markDone){var n=root.document.getElementById('qa-permission-overlay');if(n)n.remove();if(markDone)mergeState({completed:true,completedAt:Date.now()});}
+function clearAdhanPrepare(){if(adhanPrepareTimer!==null){try{root.clearTimeout(adhanPrepareTimer);}catch(_){}adhanPrepareTimer=null;}}
+function showAdhanStage(){
+  clearAdhanPrepare();
+  var btn=primaryButton();if(!btn)return;
+  btn.disabled=false;btn.dataset.stage='adhan';btn.textContent='تفعيل الأذان والمتابعة';
+  setState('location','granted');setState('notifications','ready');
+  note('الموقع أصبح جاهزًا. اضغط لتسليم جدول الصلاة الحالي إلى Android وطلب إذن الإشعارات الأصلي عند الحاجة.');
+}
+function prepareAdhanStage(reset){
+  if(!isTwaSurface()){
+    mergeState({completed:true,location:'granted',notifications:'contextual',completedAt:Date.now()});
+    closeOverlay(false);return;
+  }
+  if(reset){clearAdhanPrepare();adhanPrepareStartedAt=Date.now();}
+  if(trustedGnssReady()&&prayerRuntimeReady()&&nativePrayerBridgeReady()){showAdhanStage();return;}
+  var btn=primaryButton();if(btn){btn.disabled=true;btn.dataset.stage='prepare';btn.textContent='جاري تحديد الموقع وتجهيز الأذان...';}
+  setState('location',trustedGnssReady()?'granted':'locating');setState('notifications','contextual');
+  note('يتم الآن الحصول على موقع GNSS الموثوق وتجهيز مواقيت الصلاة. لن يتم استخدام موقع تقريبي أو افتراضي.');
+  if(Date.now()-adhanPrepareStartedAt>=ADHAN_PREPARE_TIMEOUT){
+    clearAdhanPrepare();
+    if(btn){btn.disabled=false;btn.dataset.stage='location';btn.textContent='إعادة المحاولة';}
+    note('لم يكتمل موقع GNSS أو جدول الصلاة بعد. تأكد أن خدمة الموقع مفعّلة ثم أعد المحاولة.');
     return;
   }
-  if(btn){btn.disabled=false;btn.textContent='إعادة طلب صلاحية الموقع';}
-  var note=root.document.getElementById('qa-permission-note');
-  if(note)note.textContent=locationResult==='denied'?'صلاحية الموقع مرفوضة. فعّلها من إعدادات Android أو إعدادات الموقع ثم أعد المحاولة.':'تعذر بدء طلب الموقع. تحقق من إعدادات الموقع ثم أعد المحاولة.';
+  adhanPrepareTimer=root.setTimeout(function(){adhanPrepareTimer=null;recoverTrustedGnss(false);prepareAdhanStage(false);},350);
+}
+function activateNativeAdhan(){
+  var btn=primaryButton();if(!btn)return;
+  if(!trustedGnssReady()||!prayerRuntimeReady()||!nativePrayerBridgeReady()){prepareAdhanStage(true);return;}
+  btn.disabled=true;btn.textContent='جاري تفعيل الأذان...';
+  /* Persist before the custom-scheme handoff because Android may take focus
+     immediately. If the bridge cannot launch synchronously, roll the state back. */
+  mergeState({completed:true,location:'granted',notifications:'requested',adhanNativeRequested:true,twa:true,completedAt:Date.now()});
+  var launched=false;
+  try{launched=root.QiblaPrayerNativeSync.sync()===true;}catch(_){launched=false;}
+  if(!launched){
+    mergeState({completed:false,adhanNativeRequested:false});
+    btn.disabled=false;btn.dataset.stage='adhan';btn.textContent='تفعيل الأذان والمتابعة';
+    setState('notifications','contextual');
+    note('تعذر تسليم جدول الصلاة إلى Android الآن. انتظر لحظات ثم أعد المحاولة.');
+    return;
+  }
+  setState('notifications','requested');
+  closeOverlay(false);
+}
+
+async function runPermissionRequest(){
+  var btn=primaryButton();if(!btn)return;
+  if(btn.dataset.stage==='adhan'){activateNativeAdhan();return;}
+  if(btn.dataset.stage==='prepare')return;
+  btn.disabled=true;btn.dataset.stage='location';btn.textContent='جاري طلب صلاحية الموقع...';
+  setState('notifications','contextual');
+  var locationResult=await requestLocation();
+  setState('location',locationResult);
+  if(locationResult==='granted'){
+    mergeState({completed:false,location:'granted',notifications:'contextual',twa:isTwaSurface(),locationGrantedAt:Date.now()});
+    if(typeof root.tryBrowserGPS==='function'&&!trustedGnssBusy()){
+      try{root.tryBrowserGPS();}catch(_){ }
+    }
+    recoverTrustedGnss(true);
+    prepareAdhanStage(true);
+    return;
+  }
+  btn.disabled=false;btn.dataset.stage='location';btn.textContent='إعادة طلب صلاحية الموقع';
+  if(locationResult==='denied')note('صلاحية الموقع مرفوضة. فعّلها من إعدادات Android أو إعدادات الموقع ثم أعد المحاولة.');
+  else if(locationResult==='prompt')note('لم يصل رد نهائي من Android. اضغط إعادة المحاولة وتأكد من اختيار السماح للموقع.');
+  else note('تعذر بدء طلب الموقع. تحقق من إعدادات الموقع ثم أعد المحاولة.');
 }
 function mountOnboarding(force){
   if(!root.document||mounted&&!force)return;if(!force&&!isAppSurface())return;
@@ -155,11 +232,14 @@ function mountOnboarding(force){
   mounted=true;ensureStyle();
   var old=root.document.getElementById('qa-permission-overlay');if(old)old.remove();
   var wrap=root.document.createElement('div');wrap.id='qa-permission-overlay';wrap.className='qa-permission-overlay';
-  wrap.innerHTML='<div class="qa-permission-card" role="dialog" aria-modal="true" aria-labelledby="qa-permission-title"><h2 id="qa-permission-title">صلاحيات QiblaAstro</h2><p>نطلب فقط الصلاحيات اللازمة للميزات التي تستخدمها. لا تُستخدم هذه الصلاحيات للإعلانات.</p><div class="qa-permission-item"><span class="ico">📍</span><div><b>الموقع</b><small>لحساب القبلة ومواقيت الصلاة والبيانات الفلكية من موقع الجهاز.</small></div><span class="qa-permission-state wait" data-qa-permission-state="location">بانتظار الموافقة</span></div><div class="qa-permission-item"><span class="ico">🔔</span><div><b>الإشعارات</b><small>يُطلب إذن Android الأصلي عند تشغيل ميزة تنبيه تحتاجه، مثل تنبيه الأذكار.</small></div><span class="qa-permission-state wait" data-qa-permission-state="notifications">بانتظار الموافقة</span></div><div class="qa-permission-item"><span class="ico">📷</span><div><b>الكاميرا</b><small>لن نطلبها الآن. ستظهر نافذة الإذن فقط عندما تضغط «تحقق فلكي».</small></div><span class="qa-permission-state ok">عند الحاجة فقط</span></div><div class="qa-permission-actions"><button type="button" id="qa-permission-allow" class="qa-permission-primary">السماح والمتابعة</button><button type="button" id="qa-permission-later" class="qa-permission-secondary">لاحقًا</button></div><small id="qa-permission-note" class="qa-permission-note">يمكنك تغيير الصلاحيات لاحقًا من إعدادات Android أو إعدادات الموقع.</small></div>';
+  wrap.innerHTML='<div class="qa-permission-card" role="dialog" aria-modal="true" aria-labelledby="qa-permission-title"><h2 id="qa-permission-title">صلاحيات QiblaAstro</h2><p>نطلب فقط الصلاحيات اللازمة للميزات التي تستخدمها. لا تُستخدم هذه الصلاحيات للإعلانات.</p><div class="qa-permission-item"><span class="ico">📍</span><div><b>الموقع</b><small>لحساب القبلة ومواقيت الصلاة والبيانات الفلكية من موقع الجهاز.</small></div><span class="qa-permission-state wait" data-qa-permission-state="location">بانتظار الموافقة</span></div><div class="qa-permission-item"><span class="ico">🔔</span><div><b>الإشعارات والأذان</b><small>بعد تثبيت موقعك سنسلّم جدول الصلاة إلى Android، وسيطلب إذن الإشعارات الأصلي عند الحاجة ليعمل الأذان والتطبيق مغلقًا.</small></div><span class="qa-permission-state wait" data-qa-permission-state="notifications">مع تفعيل الأذان</span></div><div class="qa-permission-item"><span class="ico">📷</span><div><b>الكاميرا</b><small>لن نطلبها الآن. ستظهر نافذة الإذن فقط عندما تضغط «تحقق فلكي».</small></div><span class="qa-permission-state ok">عند الحاجة فقط</span></div><div class="qa-permission-actions"><button type="button" id="qa-permission-allow" class="qa-permission-primary" data-stage="location">السماح والمتابعة</button><button type="button" id="qa-permission-later" class="qa-permission-secondary">لاحقًا</button></div><small id="qa-permission-note" class="qa-permission-note">الموقع مطلوب لصلب التطبيق. الإشعارات الأصلية تُطلب فقط عند تفعيل الأذان أو تنبيه يحتاجها.</small></div>';
   root.document.body.appendChild(wrap);
-  setState('notifications',currentWebNotificationState());
+  setState('notifications','contextual');
   root.document.getElementById('qa-permission-allow').addEventListener('click',runPermissionRequest);
-  root.document.getElementById('qa-permission-later').addEventListener('click',function(){closeOverlay(false);});
+  root.document.getElementById('qa-permission-later').addEventListener('click',function(){clearAdhanPrepare();closeOverlay(false);});
+  if(saved&&saved.location==='granted'){
+    setState('location','granted');recoverTrustedGnss(true);prepareAdhanStage(true);
+  }
 }
 
 function cameraPermissionErrorMessage(err){
@@ -199,8 +279,9 @@ function start(){
   root.setTimeout(function(){mountOnboarding(false);},1400);
   root.addEventListener('focus',function(){recoverTrustedGnss(true);});
   root.document.addEventListener('visibilitychange',function(){if(!root.document.hidden)recoverTrustedGnss(true);});
+  root.addEventListener('qiblaastro:prayer-runtime-sync',function(){if(root.document.getElementById('qa-permission-overlay'))prepareAdhanStage(false);});
 }
 
-root.QiblaPermissions=Object.freeze({showOnboarding:function(){mountOnboarding(true);},ensureCameraForVerification:ensureCameraPermission,isAppSurface:isAppSurface,getState:readState,requestNotifications:requestWebNotifications});
+root.QiblaPermissions=Object.freeze({showOnboarding:function(){mountOnboarding(true);},ensureCameraForVerification:ensureCameraPermission,isAppSurface:isAppSurface,getState:readState,requestNotifications:requestWebNotifications,recoverTrustedGnss:function(){return recoverTrustedGnss(true);}});
 if(root.document){if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',start,{once:true});else start();}
 })(typeof globalThis!=='undefined'?globalThis:window);
