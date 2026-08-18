@@ -64,7 +64,7 @@ for set_name in required_sets:
 scheduler=JAVA/"AzkarReminderScheduler.java"
 if scheduler.is_file():
     text=scheduler.read_text(encoding="utf-8")
-    for required in ("MIN_INTERVAL_MINUTES = 15","setAndAllowWhileIdle","ELAPSED_REALTIME_WAKEUP","KEY_NEXT_ELAPSED","scheduleNextFromDelivery","restartAfterBoot","restore(Context context)"):
+    for required in ("MIN_INTERVAL_MINUTES = 15","setAndAllowWhileIdle","ELAPSED_REALTIME_WAKEUP","KEY_NEXT_ELAPSED","scheduleNextFromDelivery","restartAfterBoot","restore(Context context)","nextFutureTarget","previousTarget + intervalMs"):
         if required not in text: fail(f"scheduler contract missing: {required}")
     if "setExact(" in text or "setExactAndAllowWhileIdle" in text: fail("Azkar scheduler must remain inexact; exact access is reserved for prayer-time Adhan")
     if "PendingIntent.getBroadcast" not in text or "AzkarReminderReceiver.class" not in text: fail("background reminder must target a broadcast receiver independent of the TWA UI")
@@ -99,5 +99,5 @@ if errors:
     raise SystemExit(1)
 print("PASS: AR/EN/FR/ID/UR resources generated and referenced by native notification UI")
 print("PASS: authenticated start/stop handoff + Android notification/channel recovery contract")
-print("PASS: 15-minute minimum + inexact idle-safe local scheduling + reboot/update restoration")
+print("PASS: 15-minute minimum + anchored inexact idle-safe local scheduling + reboot/update restoration")
 print("PASS: v2 phrase channels use stable named raw-resource paths and exact alarms remain unused by Azkar")
