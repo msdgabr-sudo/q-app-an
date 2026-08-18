@@ -70,10 +70,12 @@ function GT(id){
   if(id!=='compass'&&window._gnssWatchId!=null){
     try{navigator.geolocation.clearWatch(window._gnssWatchId);window._gnssWatchId=null;}catch(e){}
   }
-  if(id==='compass'&&gnssSource==='default'){setTimeout(function(){tryBrowserGPS();},400);}
+  // `default` was a retired pre-trusted-GNSS source name. Navigation now follows
+  // the single authoritative state used by the production inline GNSS engine.
+  if(id==='compass'&&!gnssHasTrustedFix){setTimeout(function(){tryBrowserGPS();},400);}
   if(id==='compass'){setTimeout(function(){var ds=gel('dev-slider');if(ds)ds.dispatchEvent(new Event('input'));},500);}
-  if(id==='gnss'){setTimeout(function(){if(gnssSource==='default')tryBrowserGPS();},300);}
-  if(id==='compass'||id==='gnss'){updateQiblaFromPosition();}
+  if(id==='gnss'){setTimeout(function(){if(!gnssHasTrustedFix)tryBrowserGPS();},300);}
+  if((id==='compass'||id==='gnss')&&gnssHasTrustedFix){updateQiblaFromPosition();}
   if(id==='quran'){_qrActive=true;try{qrInit();}catch(e){}}
   else{try{qrDeactivate();}catch(e){}}
   if(id==='serenity'){
