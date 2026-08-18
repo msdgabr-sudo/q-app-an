@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Validate permissions from the merged *release* AndroidManifest.
+"""Validate the merged release AndroidManifest used by the AAB.
 
-Bubblewrap features can add Android dependencies whose manifests contribute
-permissions during Gradle manifest merging. Therefore the source manifest at
-app/src/main/AndroidManifest.xml is not authoritative for the final APK/AAB.
+This gate verifies both permission policy and the native components required by
+first-run Adhan activation. It intentionally inspects Gradle's merged RELEASE
+manifest because dependency manifests and Bubblewrap generation can change the
+final package surface.
 """
 from __future__ import annotations
 
@@ -13,6 +14,10 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parent
 ANDROID = "{http://schemas.android.com/apk/res/android}"
+EXPECTED_VERSION_NAME = "3.1.1"
+EXPECTED_VERSION_CODE = "4"
+LAUNCHER = "com.qiblalabs.nativebridge.QiblaLauncherActivity"
+PRAYER_SYNC = "com.qiblalabs.nativebridge.PrayerWidgetSyncActivity"
 errors: list[str] = []
 notes: list[str] = []
 
@@ -37,13 +42,16 @@ except Exception as exc:
     raise SystemExit(1)
 
 root = tree.getroot()
-permissions = {el.get(ANDROID + "name") for el in root.findall("uses-permission") if el.get(ANDROID + "name")}
+if root.get(ANDROID + "versionName") != EXPECTED_VERSION_NAME:
+    errors.append(f"merged release versionName must be {EXPECTED_VERSION_NAME}; found {root.get(ANDROID + 'versionName')!r}")
+if root.get(ANDROID + "versionCode") != EXPECTED_VERSION_CODE:
+    errors.append(f"merged release versionCode must be {EXPECTED_VERSION_CODE}; found {root.get(ANDROID + 'versionCode')!r}")
 
+permissions = {el.get(ANDROID + "name") for el in root.findall("uses-permission") if el.get(ANDROID + "name")}
 required = {
     "android.permission.ACCESS_COARSE_LOCATION",
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.POST_NOTIFICATIONS",
-    # Native Azkar reminders are restored after reboot. No exact-alarm permission is used.
     "android.permission.RECEIVE_BOOT_COMPLETED",
 }
 for permission in sorted(required):
@@ -67,13 +75,57 @@ for permission, reason in forbidden.items():
     if permission in permissions:
         errors.append(f"forbidden permission present: {permission} ({reason})")
 
-notes.append("permission source: Gradle merged RELEASE manifest (dependency manifests included)")
+application = root.find("application")
+if application is None:
+    errors.append("merged release manifest has no application element")
+else:
+    activities = {a.get(ANDROID + "name"): a for a in application.findall("activity") if a.get(ANDROID + "name")}
+    launcher = activities.get(LAUNCHER)
+    sync = activities.get(PRAYER_SYNC)
+    if launcher is None:
+        errors.append(f"native authenticated launcher missing from merged release: {LAUNCHER}")
+    else:
+        launcher_ok = False
+        for filt in launcher.findall("intent-filter"):
+            actions = {x.get(ANDROID + "name") for x in filt.findall("action")}
+            categories = {x.get(ANDROID + "name") for x in filt.findall("category")}
+            if "android.intent.action.MAIN" in actions and "android.intent.category.LAUNCHER" in categories:
+                launcher_ok = True
+                break
+        if not launcher_ok:
+            errors.append("QiblaLauncherActivity is present but is not the MAIN/LAUNCHER activity")
+
+    if sync is None:
+        errors.append(f"native prayer sync Activity missing from merged release: {PRAYER_SYNC}")
+    else:
+        if sync.get(ANDROID + "exported") != "true":
+            errors.append("PrayerWidgetSyncActivity must be exported=true for the authenticated browser/TWA intent")
+        bridge_ok = False
+        for filt in sync.findall("intent-filter"):
+            actions = {x.get(ANDROID + "name") for x in filt.findall("action")}
+            categories = {x.get(ANDROID + "name") for x in filt.findall("category")}
+            data = filt.find("data")
+            if (
+                "android.intent.action.VIEW" in actions
+                and "android.intent.category.DEFAULT" in categories
+                and "android.intent.category.BROWSABLE" in categories
+                and data is not None
+                and data.get(ANDROID + "scheme") == "qiblaastro"
+                and data.get(ANDROID + "host") == "prayer-sync"
+            ):
+                bridge_ok = True
+                break
+        if not bridge_ok:
+            errors.append("PrayerWidgetSyncActivity qiblaastro://prayer-sync VIEW/BROWSABLE contract is missing")
+
+notes.append("source: Gradle merged RELEASE manifest; dependency manifests included")
+notes.append("release identity: QiblaAstro 3.1.1 code4")
+notes.append("native Adhan path: QiblaLauncherActivity token -> PrayerWidgetSyncActivity -> POST_NOTIFICATIONS")
 notes.append("camera remains a web/TWA site permission; CAMERA is not forced into wrapper manifest")
-notes.append("native Azkar reminders use POST_NOTIFICATIONS + RECEIVE_BOOT_COMPLETED")
 notes.append("exact-alarm permissions remain forbidden; scheduler uses setAndAllowWhileIdle")
 
-print("QiblaAstro ELITE — Merged Release Android Permission Gate")
-print("=" * 58)
+print("QiblaAstro ELITE — Merged Release Native/Permission Gate")
+print("=" * 62)
 print("Manifest:", MANIFEST)
 for note in notes:
     print("NOTE:", note)
@@ -83,6 +135,6 @@ for permission in sorted(permissions):
 if errors:
     for error in errors:
         print("ERROR:", error, file=sys.stderr)
-    print(f"FAILED: {len(errors)} permission policy issue(s)", file=sys.stderr)
+    print(f"FAILED: {len(errors)} merged-release issue(s)", file=sys.stderr)
     raise SystemExit(1)
-print("PASS: merged release permissions match the approved first-release policy")
+print("PASS: release 3.1.1 code4 contains the authenticated native Adhan permission path")
