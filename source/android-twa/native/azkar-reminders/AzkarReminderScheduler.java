@@ -19,6 +19,7 @@ public final class AzkarReminderScheduler {
     static final int REQUEST_CODE = 7124;
     public static final int MIN_INTERVAL_MINUTES = 15;
     public static final int DEFAULT_INTERVAL_MINUTES = 15;
+    private static final long MIN_FUTURE_MARGIN_MS = 5_000L;
 
     private AzkarReminderScheduler() {}
 
@@ -75,8 +76,10 @@ public final class AzkarReminderScheduler {
         if (!isEnabled(context)) return false;
         SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         long now = SystemClock.elapsedRealtime();
-        long target = p.getLong(KEY_NEXT_ELAPSED, 0L);
-        if (target <= now + 5_000L) target = now + intervalMinutes(context) * 60_000L;
+        long target = nextFutureTarget(
+                p.getLong(KEY_NEXT_ELAPSED, 0L),
+                now,
+                intervalMinutes(context));
         return scheduleAt(context, target);
     }
 
@@ -87,7 +90,23 @@ public final class AzkarReminderScheduler {
 
     public static boolean scheduleNextFromDelivery(Context context) {
         if (!isEnabled(context)) return false;
-        return scheduleAt(context, SystemClock.elapsedRealtime() + intervalMinutes(context) * 60_000L);
+        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        long now = SystemClock.elapsedRealtime();
+        long intervalMs = intervalMinutes(context) * 60_000L;
+        long previousTarget = p.getLong(KEY_NEXT_ELAPSED, 0L);
+        long candidate = previousTarget > 0L ? previousTarget + intervalMs : now + intervalMs;
+        candidate = nextFutureTarget(candidate, now, intervalMinutes(context));
+        return scheduleAt(context, candidate);
+    }
+
+    static long nextFutureTarget(long candidate, long now, int intervalMinutes) {
+        long intervalMs = sanitizeInterval(intervalMinutes) * 60_000L;
+        if (candidate <= 0L) candidate = now + intervalMs;
+        long minimum = now + MIN_FUTURE_MARGIN_MS;
+        if (candidate >= minimum) return candidate;
+        long behind = minimum - candidate;
+        long steps = (behind + intervalMs - 1L) / intervalMs;
+        return candidate + steps * intervalMs;
     }
 
     private static boolean scheduleAt(Context context, long triggerElapsedRealtime) {
