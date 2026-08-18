@@ -23,7 +23,7 @@ function isTwaSurface(){
   }catch(_){return false;}
 }
 function captureNativeState(){
-  var value=null;
+  var previous=nativeState,value=null;
   try{
     var raw=String(root.location&&root.location.hash||'').replace(/^#/,'');
     if(raw){
@@ -42,6 +42,7 @@ function captureNativeState(){
     }
   }catch(_){value=null;}
   nativeState=value;
+  if(previous!==nativeState)gpsAttempted=false;
   return value;
 }
 function trustedFix(){
@@ -148,18 +149,20 @@ function refresh(){
   syncOnboarding();
   if(nativeState===true&&!trustedFix())requestExistingGps(false);
 }
+function handleNativeReturn(){captureNativeState();refresh();}
 function start(){
   captureNativeState();
   if(!isTwaSurface()||nativeState===null){restoreGpsGuard();return;}
   ensureStyle();installGpsGuard();updatePermissionState();refresh();
   if(root.document){
     root.document.addEventListener('click',interceptOnboarding,true);
-    try{observer=new MutationObserver(function(){renderButton();syncOnboarding();});observer.observe(root.document.body||root.document.documentElement,{childList:true,subtree:true,attributes:true,characterData:true});}catch(_){ }
+    try{observer=new MutationObserver(function(){renderButton();syncOnboarding();});observer.observe(root.document.body||root.document.documentElement,{childList:true,subtree:true});}catch(_){ }
   }
+  root.addEventListener('hashchange',handleNativeReturn);
   root.addEventListener('qiblaastro:gnss-update',refresh);
   root.addEventListener('focus',refresh);
   root.document&&root.document.addEventListener('visibilitychange',function(){if(!root.document.hidden)refresh();});
-  pollTimer=root.setInterval(function(){renderButton();syncOnboarding();},1000);
+  pollTimer=root.setInterval(function(){installGpsGuard();renderButton();syncOnboarding();},1000);
 }
 root.QiblaLocationServiceControl=Object.freeze({isKnownDisabled:isKnownDisabled,isEnabled:function(){return nativeState===true;},openSettings:openSettings,refresh:refresh,getState:function(){return nativeState;}});
 if(root.document){if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',start,{once:true});else start();}
