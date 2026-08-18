@@ -3,7 +3,28 @@
 'use strict';
 var lastKey='',timer=0,TOKEN_KEY='qiblaastro:native-token',AUTO_KEY='qiblaastro:prayer-native-sync-enabled:v1',OWNER_KEY='qiblaastro:prayer-native-owner:v1',LAST_SYNC_KEY='qiblaastro:prayer-native-sync-last:v1',PERMISSION_STATE_KEY='qiblaastro:permissions-onboarding:v2',HANDOFF_TIMEOUT_MS=120000,PLAN_DAYS=180;
 function isTwa(){try{var q=new URLSearchParams(root.location.search||'');return q.get('twa')==='1'||root.sessionStorage.getItem('qiblaastro:twa')==='1';}catch(_){return false;}}
-function setOwner(active){try{root.localStorage.setItem(OWNER_KEY,active?'1':'0');if(active){root.localStorage.setItem(AUTO_KEY,'1');var saved={};try{saved=JSON.parse(root.localStorage.getItem(PERMISSION_STATE_KEY)||'{}')||{};}catch(_){saved={};}saved.completed=true;saved.location='granted';saved.notifications='granted';saved.adhanNativeRequested=true;saved.twa=true;saved.completedAt=Date.now();root.localStorage.setItem(PERMISSION_STATE_KEY,JSON.stringify(saved));}}catch(_){}}
+function localAdhanEnabled(){try{var api=root.QiblaAdhanUI,st=api&&typeof api.getState==='function'?api.getState():null;return !!(st&&st.enabled);}catch(_){return false;}}
+function permissionState(){try{return JSON.parse(root.localStorage.getItem(PERMISSION_STATE_KEY)||'{}')||{};}catch(_){return {};}}
+function writePermissionState(saved){try{root.localStorage.setItem(PERMISSION_STATE_KEY,JSON.stringify(saved||{}));}catch(_){}}
+function setOwner(active){
+  try{
+    root.localStorage.setItem(OWNER_KEY,active?'1':'0');
+    var saved=permissionState();
+    if(active){
+      root.localStorage.setItem(AUTO_KEY,'1');
+      saved.completed=true;saved.location='granted';saved.notifications='granted';saved.adhanNativeRequested=true;saved.twa=true;saved.completedAt=Date.now();
+      writePermissionState(saved);return;
+    }
+    var wasNativeRequested=root.localStorage.getItem(AUTO_KEY)==='1'||saved.adhanNativeRequested===true;
+    if(wasNativeRequested&&localAdhanEnabled()){
+      // A Play/native upgrade, revoked notification permission, revoked exact-alarm
+      // access or an exhausted plan must re-enter the existing permission cycle.
+      // Do not silently leave a previously-enabled user on Web-only fallback.
+      saved.completed=false;saved.notifications='contextual';saved.adhanNativeRequested=false;saved.twa=true;delete saved.completedAt;
+      writePermissionState(saved);
+    }
+  }catch(_){ }
+}
 function nativeOwnerConfirmed(){try{return isTwa()&&root.localStorage.getItem(OWNER_KEY)==='1';}catch(_){return false;}}
 function captureToken(){
   try{
@@ -61,7 +82,7 @@ function launchOnboardingBridge(q){
     function cleanup(){try{root.removeEventListener('blur',onDepart,true);}catch(_){}try{root.removeEventListener('pagehide',onDepart,true);}catch(_){}try{root.removeEventListener('focus',onReturn,true);}catch(_){}try{if(root.document){root.document.removeEventListener('visibilitychange',onVisibility,true);}}catch(_){}if(timerId!==null){try{root.clearTimeout(timerId);}catch(_){}timerId=null;}}
     function finish(ok){if(done)return;done=true;cleanup();resolve(ok===true);}
     function onDepart(){departed=true;}
-    function onReturn(){if(!departed)return;root.setTimeout(function(){captureToken();finish(nativeOwnerConfirmed());},180);}
+    function onReturn(){if(!departed)return;root.setTimeout(function(){captureToken();finish(nativeOwnerConfirmed());},600);}
     function onVisibility(){try{if(root.document&&root.document.hidden)onDepart();else onReturn();}catch(_){} }
     try{root.addEventListener('blur',onDepart,true);root.addEventListener('pagehide',onDepart,true);root.addEventListener('focus',onReturn,true);if(root.document)root.document.addEventListener('visibilitychange',onVisibility,true);}catch(_){}
     timerId=root.setTimeout(function(){finish(false);},HANDOFF_TIMEOUT_MS);
