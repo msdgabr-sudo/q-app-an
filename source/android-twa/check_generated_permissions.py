@@ -18,6 +18,7 @@ EXPECTED_VERSION_NAME = "3.1.1"
 EXPECTED_VERSION_CODE = "4"
 LAUNCHER = "com.qiblalabs.nativebridge.QiblaLauncherActivity"
 PRAYER_SYNC = "com.qiblalabs.nativebridge.PrayerWidgetSyncActivity"
+PRAYER_BOOT = "com.qiblalabs.nativebridge.PrayerBootReceiver"
 errors: list[str] = []
 notes: list[str] = []
 
@@ -53,6 +54,7 @@ required = {
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.POST_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.SCHEDULE_EXACT_ALARM",
 }
 for permission in sorted(required):
     if permission not in permissions:
@@ -68,8 +70,7 @@ forbidden = {
     "android.permission.WRITE_CONTACTS": "contacts are not used",
     "android.permission.READ_CALENDAR": "calendar data is not read",
     "android.permission.WRITE_CALENDAR": "calendar data is not written",
-    "android.permission.SCHEDULE_EXACT_ALARM": "Azkar reminders intentionally use inexact idle-safe alarms",
-    "android.permission.USE_EXACT_ALARM": "Azkar reminders intentionally use inexact idle-safe alarms",
+    "android.permission.USE_EXACT_ALARM": "Play-restricted auto-granted exact alarm permission is not used; user-granted SCHEDULE_EXACT_ALARM is required instead",
 }
 for permission, reason in forbidden.items():
     if permission in permissions:
@@ -80,8 +81,10 @@ if application is None:
     errors.append("merged release manifest has no application element")
 else:
     activities = {a.get(ANDROID + "name"): a for a in application.findall("activity") if a.get(ANDROID + "name")}
+    receivers = {r.get(ANDROID + "name"): r for r in application.findall("receiver") if r.get(ANDROID + "name")}
     launcher = activities.get(LAUNCHER)
     sync = activities.get(PRAYER_SYNC)
+    boot = receivers.get(PRAYER_BOOT)
     if launcher is None:
         errors.append(f"native authenticated launcher missing from merged release: {LAUNCHER}")
     else:
@@ -118,11 +121,20 @@ else:
         if not bridge_ok:
             errors.append("PrayerWidgetSyncActivity qiblaastro://prayer-sync VIEW/BROWSABLE contract is missing")
 
+    if boot is None:
+        errors.append(f"prayer reboot/exact-permission receiver missing: {PRAYER_BOOT}")
+    else:
+        actions=set()
+        for filt in boot.findall("intent-filter"):
+            actions.update(x.get(ANDROID + "name") for x in filt.findall("action"))
+        if "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" not in actions:
+            errors.append("PrayerBootReceiver must reschedule when exact-alarm special access is granted")
+
 notes.append("source: Gradle merged RELEASE manifest; dependency manifests included")
 notes.append("release identity: QiblaAstro 3.1.1 code4")
-notes.append("native Adhan path: QiblaLauncherActivity token -> PrayerWidgetSyncActivity -> POST_NOTIFICATIONS")
+notes.append("native Adhan path: QiblaLauncherActivity token -> PrayerWidgetSyncActivity -> POST_NOTIFICATIONS -> SCHEDULE_EXACT_ALARM -> exact prayer alarm")
 notes.append("camera remains a web/TWA site permission; CAMERA is not forced into wrapper manifest")
-notes.append("exact-alarm permissions remain forbidden; scheduler uses setAndAllowWhileIdle")
+notes.append("USE_EXACT_ALARM remains forbidden; exact alarm access is user-granted through SCHEDULE_EXACT_ALARM")
 
 print("QiblaAstro ELITE — Merged Release Native/Permission Gate")
 print("=" * 62)
@@ -137,4 +149,4 @@ if errors:
         print("ERROR:", error, file=sys.stderr)
     print(f"FAILED: {len(errors)} merged-release issue(s)", file=sys.stderr)
     raise SystemExit(1)
-print("PASS: release 3.1.1 code4 contains the authenticated native Adhan permission path")
+print("PASS: release 3.1.1 code4 contains the authenticated exact native Adhan permission path")
