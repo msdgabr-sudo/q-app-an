@@ -91,6 +91,8 @@ assert(nativeLauncher.includes('nativeAdhan=')&&nativeLauncher.includes('PrayerN
 assert(sync.includes('function installWebFallbackGuard()'));
 assert(sync.includes('if(nativeOwnerConfirmed())return;return webCheck(now,cache);'),'legacy web scheduler must remain only as a fallback outside confirmed native ownership');
 assert(adhanUi.includes('root._checkAdhan=function'),'existing web scheduler stays intact rather than being deleted/replaced');
+assert(sync.includes("if(!st||!st.enabled)return false"),'native repair loop must stop when master Adhan is disabled');
+assert(sync.includes("prayers[name]&&prayers[name]!=='off'"),'native repair loop must stop when all five prayer alert modes are off');
 
 // First-run handoff cannot call a mere blur "success". Denial returns to the same overlay; success restarts the TWA with nativeAdhan=1.
 assert(permissions.includes("btn.dataset.stage='adhan'"));
@@ -122,3 +124,4 @@ console.log('Permissions/GNSS/Adhan cycle: PASS');
 console.log('Native order: location -> prayer plan -> POST_NOTIFICATIONS -> SCHEDULE_EXACT_ALARM -> exact prayer-time Adhan: PASS');
 console.log('Ownership: confirmed Android Native suppresses Web audio; Web remains fallback otherwise: PASS');
 console.log('Plan: authoritative prayer engine -> cached 180-day dated schedule -> startup/location/runtime refresh: PASS');
+console.log('Edge case: all prayer modes off -> no permission-repair loop: PASS');
