@@ -27,6 +27,7 @@ foreach($pair in $adhan.GetEnumerator()){$from=Join-Path $RepoRoot $pair.Key;if(
 $text=Get-Content -LiteralPath $Manifest -Raw
 if(-not $text.Contains('android.permission.RECEIVE_BOOT_COMPLETED')){$text=$text -replace '(<application\b)',"    <uses-permission android:name=`"android.permission.RECEIVE_BOOT_COMPLETED`" />`r`n`r`n`$1"}
 if(-not $text.Contains('android.permission.POST_NOTIFICATIONS')){$text=$text -replace '(<application\b)',"    <uses-permission android:name=`"android.permission.POST_NOTIFICATIONS`" />`r`n`r`n`$1"}
+if(-not $text.Contains('android.permission.SCHEDULE_EXACT_ALARM')){$text=$text -replace '(<application\b)',"    <uses-permission android:name=`"android.permission.SCHEDULE_EXACT_ALARM`" />`r`n`r`n`$1"}
 $marker='<!-- QIBLAASTRO_AUTHENTICATED_PRAYER_WIDGET -->'
 if(-not $text.Contains($marker)){$components=@"
         $marker
@@ -34,7 +35,7 @@ if(-not $text.Contains($marker)){$components=@"
             <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="qiblaastro" android:host="prayer-sync" /></intent-filter>
         </activity>
         <receiver android:name="com.qiblalabs.nativebridge.PrayerNotificationReceiver" android:exported="false" />
-        <receiver android:name="com.qiblalabs.nativebridge.PrayerBootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.intent.action.TIMEZONE_CHANGED" /><action android:name="android.intent.action.TIME_SET" /></intent-filter></receiver>
+        <receiver android:name="com.qiblalabs.nativebridge.PrayerBootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.intent.action.TIMEZONE_CHANGED" /><action android:name="android.intent.action.TIME_SET" /><action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" /></intent-filter></receiver>
         <receiver android:name="com.qiblalabs.widget.QiblaWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/qibla_widget_info" /></receiver>
 "@;$text=$text -replace '</application>',($components+"`r`n    </application>")}
 Set-Content -LiteralPath $Manifest -Value $text -Encoding UTF8
@@ -59,9 +60,13 @@ $text=Get-Content -LiteralPath $Manifest -Raw
 
 if($text -match 'android:name=["''](?:com\.qiblalabs\.)?WidgetDataActivity["'']'){throw 'Legacy exported WidgetDataActivity must not return.'}
 if($text -notmatch 'QiblaLauncherActivity'){throw 'Authenticated launcher replacement failed.'}
+if($text -notmatch 'android.permission.SCHEDULE_EXACT_ALARM'){throw 'Exact prayer alarm permission injection failed.'}
 $sync=Get-Content -LiteralPath (Join-Path $JavaBridge 'PrayerWidgetSyncActivity.java') -Raw
+$scheduler=Get-Content -LiteralPath (Join-Path $JavaBridge 'PrayerNativeScheduler.java') -Raw
 $token=Get-Content -LiteralPath (Join-Path $JavaBridge 'NativeBridgeToken.java') -Raw
 if($sync -notmatch 'NativeBridgeToken\.valid'){throw 'Prayer/widget sync token validation missing.'}
+if($sync -notmatch 'ACTION_REQUEST_SCHEDULE_EXACT_ALARM'){throw 'Contextual exact-alarm settings request missing.'}
+if($scheduler -notmatch 'setExactAndAllowWhileIdle'){throw 'Prayer-time exact alarm scheduler missing.'}
 if($token -notmatch 'SecureRandom' -or $token -notmatch 'MODE_PRIVATE'){throw 'Per-install cryptographic private token store missing.'}
 if($sync -notmatch 'MODE_PRIVATE'){throw 'Private native prayer/widget store requirement missing.'}
-Write-Host 'PASS: authenticated local prayer notifications + local Adhan + translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
+Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
