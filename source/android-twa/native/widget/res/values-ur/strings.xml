@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_app_name">QiblaAstro</string>
+    <string name="widget_description">نماز کے اوقات اور قبلہ ایک نظر میں</string>
     <string name="widget_city_unavailable">شہر معلوم کرنے کے لیے ایپ کھولیں</string>
+    <string name="widget_location_unavailable_short">مقام متعین نہیں</string>
     <string name="widget_refresh_required">تازہ معلومات کے لیے ایپ کھولیں</string>
     <string name="widget_value_unavailable">—</string>
+    <string name="widget_next_prayer_label">اگلی نماز</string>
+    <string name="widget_qibla_label">سمت قبلہ</string>
+    <string name="widget_true_north">حقیقی شمال سے</string>
     <string name="widget_qibla_unavailable">قبلہ —</string>
     <string name="widget_qibla_value">قبلہ %1$s°</string>
+    <string name="widget_qibla_degrees">%1$s°</string>
+    <string name="widget_updated_value">آخری تازہ کاری %1$s</string>
 </resources>
