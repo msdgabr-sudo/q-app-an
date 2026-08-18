@@ -13,11 +13,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 EXPECTED_PACKAGE = "com.qiblalabs"
 EXPECTED_APP_NAME = "QiblaAstro ELITE"
 EXPECTED_WEB_MANIFEST_NAME = "QiblaAstro ELITE — بوصلة القبلة الفلكية"
-EXPECTED_VERSION_NAME = "3.1.0"
-EXPECTED_VERSION_CODE = "3"
+EXPECTED_VERSION_NAME = "3.1.1"
+EXPECTED_VERSION_CODE = "4"
 EXPECTED_GA4 = "G-1D1GKVZB74"
 EXPECTED_DOMAIN = "app.qiblalabs.com"
-EXPECTED_SW_VERSION = "qiblaastro-v6.16-azkar-direct-native"
+EXPECTED_SW_VERSION = "qiblaastro-v6.19-adhan-exact-native"
 
 errors: list[str] = []
 notes: list[str] = []

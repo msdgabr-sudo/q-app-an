@@ -1,8 +1,8 @@
 # QiblaAstro ELITE — Pre-APK Android Identity
 
-**Branch:** `a2-release-prep`  
+**Release source:** `main/source`  
 **Status:** Release-preparation identity freeze  
-**Date:** 2026-08-14
+**Updated:** 2026-08-18
 
 ## Approved release identity
 
@@ -10,56 +10,67 @@
 - Developer name / brand: `Qiblalabs`
 - App name: `QiblaAstro ELITE`
 - Android Package ID: `com.qiblalabs`
-- Version Name: `3.1.0`
-- Version Code: `3`
+- Version Name: `3.1.1`
+- Version Code: `4`
 - Approved TWA origin: `https://app.qiblalabs.com/`
 - Web Manifest URL: `https://app.qiblalabs.com/manifest.json`
 - Digital Asset Links URL: `https://app.qiblalabs.com/.well-known/assetlinks.json`
 - Privacy Policy: `https://qiblalabs.com/privacy.html`
 - GA4 Measurement ID: `G-1D1GKVZB74`
-- Ads in first release: `No`
+- Ads in this release: `No`
+- Native prayer delivery: authenticated Android bridge with `POST_NOTIFICATIONS` + user-granted `SCHEDULE_EXACT_ALARM`
+- Actual prayer-time event: `AlarmManager.setExactAndAllowWhileIdle`
+- Restricted `USE_EXACT_ALARM`: `Not used`
 
 ## Analytics/privacy boundary
 
 GA4 is limited to coarse usage telemetry: application/surface open, stable screen/page names, navigation views, and active-screen duration. No application location coordinates, camera frames, compass readings, astronomical-verification values, prayer-specific user data, Quran reading detail, Adhkar content, or Android bridge tokens may be transmitted to GA4.
 
-The release-preparation analytics implementation is web/TWA `gtag.js` only. It does not add Firebase Analytics, an advertising SDK, `AD_ID`, or a new Android runtime permission. Therefore this analytics work does not itself create a new Android permission dialog. Google Play Data safety must still disclose analytics collection consistently with the public privacy policy.
-
-Analytics is non-essential. If applicable consent is denied, analytics measurement must not be treated as required application functionality. QiblaAstro must continue operating normally without analytics. No attempt may be made to bypass a user's consent choice merely to preserve metrics.
-
-Current release analytics cache: `qiblaastro-v6.08-release-analytics`.
+The release analytics implementation is web/TWA `gtag.js` only. It does not add Firebase Analytics, an advertising SDK, `AD_ID`, or an analytics-specific Android runtime permission. Application functionality remains independent of analytics consent.
 
 ## Android / TWA hard gates
 
-1. Do not change `com.qiblalabs` after the first Play upload.
-2. Treat `https://app.qiblalabs.com/` as the production TWA origin; do not substitute a GitHub Pages path in the production Android package.
-3. Do not publish `.well-known/assetlinks.json` with a guessed certificate fingerprint.
-4. Generate or obtain the real Android signing certificate first.
-5. Record the real SHA-256 signing certificate fingerprint.
-6. Only then publish `.well-known/assetlinks.json` for `com.qiblalabs` at the root of the approved origin.
-7. Verify the Digital Asset Links URL over HTTPS before considering TWA fullscreen ready.
-8. Build and test an AAB on the Internal testing track before production.
-9. First release must not request `AD_ID` or include an advertising SDK unless Play disclosures/privacy are intentionally revised.
-10. Never commit a signing keystore, signing password, Play service-account JSON, or private key to this public repository.
+1. Keep Package ID `com.qiblalabs` unchanged.
+2. Keep `https://app.qiblalabs.com/` as the production TWA origin.
+3. Do not publish Digital Asset Links with a guessed certificate fingerprint.
+4. Keep signing material outside the repository.
+5. Target API 36.
+6. Require the merged release manifest to contain the authenticated `QiblaLauncherActivity` and `PrayerWidgetSyncActivity` bridge.
+7. Require `POST_NOTIFICATIONS` and `SCHEDULE_EXACT_ALARM` for enabled Native Adhan on applicable Android versions.
+8. Reject `USE_EXACT_ALARM`, `AD_ID`, microphone, broad storage and unrelated sensitive permissions.
+9. Build and test the AAB on the appropriate Google Play testing track before production.
+10. Do not change QT, compass, WMM2025, astronomical verification, camera or prayer equations as part of Android wrapper work.
+
+## Native Adhan release contract
+
+- The existing web prayer calculation engine remains the only source of prayer times.
+- A validated date-stamped plan is handed to Android through the authenticated per-install bridge.
+- The current native plan horizon is up to 180 days and must match the displayed current-day prayer schedule before it can cross the bridge.
+- Android requests notification permission first, then exact-alarm special access when required.
+- The actual prayer event uses an exact idle-safe alarm; the optional pre-prayer notice remains separate and inexact.
+- Native ownership is reported back to the TWA only when a valid schedule and required permissions are active.
+- The legacy Web Adhan scheduler remains a fallback only while Native ownership is not confirmed, preventing duplicate playback.
+- Reboot, app replacement, device time/timezone changes and exact-alarm grant changes trigger rescheduling from the stored plan.
 
 ## Build tooling decision
 
-- Use the current GoogleChromeLabs Bubblewrap/PWABuilder TWA toolchain only after the approved origin is live and serving the intended A2 release candidate.
-- Bubblewrap must preserve Package ID `com.qiblalabs`, host `app.qiblalabs.com`, start path `/?twa=1`, app version `3.1.0`, version code `3`, and the approved 512px/maskable icons.
-- Keep signing material outside Git and inject it only at build/signing time.
-- When Play App Signing is enabled, publish the Google Play **app signing certificate** SHA-256 in Digital Asset Links. A locally signed test APK may additionally require its own certificate fingerprint for local fullscreen verification.
+- Generate the Android wrapper from `android-twa/twa-manifest.json` using the guarded Bubblewrap path.
+- Preserve Package ID `com.qiblalabs`, host `app.qiblalabs.com`, start path `/?twa=1`, app version `3.1.1`, version code `4`, and the approved icons.
+- Enforce API 36 after Bubblewrap generation.
+- Inject only the approved Native features, then inspect the **merged release AndroidManifest** before accepting the AAB.
 
 ## Acceptance gate before AAB upload
 
 - PWA manifest valid.
 - Service Worker registration/offline startup validated.
 - Required icons and maskable icons validated.
-- Camera/location permissions validated.
-- GA4 Realtime test confirms approved Measurement ID, stable screen names and engagement timing only when analytics is legally/appropriately enabled.
-- Privacy page publicly reachable and consistent with Play Data safety.
-- `app.qiblalabs.com` resolves to the intended release candidate over HTTPS.
-- Package ID and version fields match this document.
-- Signing certificate SHA-256 captured.
-- Digital Asset Links verified.
-- TWA opens without browser chrome.
-- Internal testing build installs and launches successfully.
+- Location and camera flows validated on a physical device.
+- `POST_NOTIFICATIONS` allow/deny paths validated.
+- `Alarms & reminders` allow/deny paths validated on Android 12+.
+- Adhan fires at the displayed prayer minute with the app closed and screen locked.
+- Optional pre-prayer notification does not change the Adhan time.
+- Only one Adhan plays while the TWA is open.
+- Future prayer alarms restore after device restart.
+- Revoked exact-alarm or notification access does not produce a false-success state.
+- Package/version fields match `3.1.1 / code4`.
+- Digital Asset Links and Play signing certificate are verified before final rollout.
