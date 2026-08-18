@@ -16,8 +16,6 @@ assert(nav.includes("requestAnimationFrame(function()"),'Navigation must repeat 
 assert(nav.includes("qiblaastro:navigation-change"),'Navigation must publish one stable page-change event');
 assert(nav.includes("classList.remove('qa-astro-fullscreen-mode')"),'Compass fullscreen state must not leak into Home');
 assert(nav.includes("setAttribute('data-qa-active-page',id)"),'Navigation must synchronously publish the active route for isolated overlays');
-assert(!nav.includes("gnssSource==='default'")&&!nav.includes('gnssSource==="default"'),'Navigation must not retain the obsolete default GNSS source state');
-assert(nav.includes("!gnssHasTrustedFix")&&nav.includes("gnssHasTrustedFix){updateQiblaFromPosition()"),'Navigation GNSS fallback must use the trusted-fix state, not a retired source name');
 
 const pageCss=read('css/07-pages.css');
 assert(pageCss.includes('#qa-compass-home-button')&&pageCss.includes('+ 46px'),'Compass Home control must remain independently raised at the approved phone position');
@@ -50,9 +48,11 @@ assert(bootstrap.includes('internal-screen-chrome.css?v=20260814-surface-contrac
 assert(bootstrap.includes('page-registry.js?v=20260814-prayer-overrides1'),'Bootstrap must request the registry that includes prayer overrides');
 assert(bootstrap.includes('js/presentation/prayer/location-settings-ui.js'),'Prayer-only location settings UI must be loaded after the Prayer page mounts');
 assert(bootstrap.includes('js/presentation/prayer/calculation-settings-ui.js'),'Prayer calculation settings UI must be loaded after the Prayer page mounts');
+assert(bootstrap.includes('js/presentation/permissions-onboarding.js'),'Production bootstrap must load the existing permissions/GNSS startup integration layer');
 
 const homeFinalizer=read('js/home-reference-finalizer.js');
 assert(homeFinalizer.includes('icons/hm-astronomy.png'),'Home astronomy card must use the dedicated project astronomy icon');
+assert(homeFinalizer.includes('js/presentation/bootstrap.js'),'Guaranteed Home finalizer must load the production presentation bootstrap');
 
 const picker=read('js/i18n/home-language-picker.js');
 assert(picker.includes("window.addEventListener('click'"),'Language picker must capture on window before the legacy document interceptor');
@@ -69,26 +69,30 @@ for(const id of ['page-home','page-compass','page-night','qa-home','qaLangToggle
  assert.strictEqual(count,1,`Critical shell id must be unique: ${id}`);
 }
 assert(index.includes('data-qibla-home-final')&&index.includes('data-qibla-home-finalizer'),'Static Home scripts must remain explicit in index.html');
+assert(index.includes('function tryBrowserGPS()'),'Production index must retain the existing trusted GNSS implementation');
+assert(!index.includes('src="js/05-gnss.js"')&&!index.includes("src='js/05-gnss.js'"),'Production must not accidentally run a second external GNSS implementation alongside the inline engine');
 
 const sw=read('service-worker.js');
 for(const asset of ['./index.html','./js/06-navigation.js','./js/home-final.js','./js/home-reference-finalizer.js','./css/home-action-layout-233.css','./js/i18n/home-language-picker.js','./css/internal-screen-chrome.css','./js/presentation/bootstrap.js','./js/presentation/page-registry.js']){
  assert(sw.includes("'"+asset+"'"),`Service worker must precache stable shell asset: ${asset}`);
 }
+assert(sw.includes("'./js/presentation/permissions-onboarding.js'"),'Service worker must keep the production permissions/GNSS startup integration in the critical cache');
+assert(/fetch\(r,\{cache:['\"]no-store['\"]\}\)/.test(sw),'Service worker must network-refresh JS/CSS/HTML so GNSS startup fixes are not pinned stale');
 
 const gnss=read('js/05-gnss.js');
 assert((gnss.match(/maximumAge:0/g)||[]).length>=2,'GNSS manual refresh/watch must request fresh device fixes');
 assert(!/fetch\s*\(|ipapi|ipinfo|geolocation-db/i.test(gnss),'GNSS policy must not call IP/external geolocation');
 assert(gnss.includes("gnssUpdating=true")&&gnss.includes("gnssUpdating=false"),'GNSS refresh busy state missing');
-assert(gnss.includes('function _startTrustedGnssIfAllowed()'),'GNSS must restore the existing trusted-device cycle on app startup');
-assert(gnss.includes("navigator.permissions.query({name:'geolocation'})")&&gnss.includes("status.state==='granted'"),'GNSS startup must only auto-start after the existing location permission is granted');
-assert(gnss.includes("'qiblaastro:permissions-onboarding:v2'")&&gnss.includes("s.location==='granted'"),'GNSS startup must retain a safe fallback to the existing onboarding grant state');
-assert(gnss.includes('const _GNSS_RETRY_DELAYS = [1200, 3000, 6000]'),'GNSS transient failure retry must be bounded and deterministic');
-assert(gnss.includes("if(err&&err.code===1){")&&gnss.includes("showGnssUnavailable(msg);return;"),'Permission denial must fail closed without an automatic retry loop');
-assert(gnss.includes("if(err&&err.code===3)")&&gnss.includes("else if(err&&err.code===2)")&&gnss.includes('_scheduleGnssRetry();'),'GNSS timeout/unavailable failures must recover with bounded retries');
-assert(gnss.includes("window.addEventListener('focus',_startTrustedGnssIfAllowed)")&&gnss.includes("visibilitychange"),'GNSS must recover when the installed app returns to foreground');
-assert(gnss.includes("qiblaastro:gnss-update")&&gnss.includes("trusted:true"),'A trusted fix must publish the existing GNSS-ready integration event');
-assert(gnss.includes("!gnssHasTrustedFix||gnssSource!=='gps'||!Number.isFinite(LAT)||!Number.isFinite(LON)"),'GNSS-dependent Qibla publication must remain fail-closed until finite trusted device coordinates exist');
-assert(!gnss.includes('calcPrayers(')&&!gnss.includes('sunPos(')&&!gnss.includes('moonPos(')&&!gnss.includes('AstroVerification'),'GNSS lifecycle fix must not duplicate prayer/Falaki/astronomical-verification engines');
+
+const permissions=read('js/presentation/permissions-onboarding.js');
+assert(permissions.includes('function recoverTrustedGnss(reset)'),'Existing permissions integration must own startup recovery of the existing GNSS function');
+assert(permissions.includes("typeof root.tryBrowserGPS==='function'")&&permissions.includes('root.tryBrowserGPS()'),'Startup recovery must reuse the existing production GNSS function rather than duplicate its equations');
+assert(permissions.includes("queryLocationPermission()")&&permissions.includes("permission!=='granted'"),'Automatic GNSS startup must remain permission-gated');
+assert(permissions.includes('GNSS_RECOVERY_DELAYS=[13000,17000,25000]'),'Transient cold-start GNSS recovery must be bounded rather than loop forever');
+assert(permissions.includes("root.setTimeout(function(){recoverTrustedGnss(true);},100)"),'Installed app must check an already-granted location permission immediately on each startup');
+assert(permissions.includes("root.addEventListener('focus',function(){recoverTrustedGnss(true);})")&&permissions.includes("visibilitychange"),'GNSS recovery must resume when the installed app returns to foreground');
+assert(permissions.includes("typeof gnssHasTrustedFix!=='undefined'")&&permissions.includes("gnssSource==='gps'")&&permissions.includes('Number.isFinite(Number(LAT))')&&permissions.includes('Number.isFinite(Number(LON))'),'Recovery must stop only after the existing trusted finite GNSS state is ready');
+assert(!permissions.includes('calcQibla(')&&!permissions.includes('refreshMdeclFromTrustedGnss(')&&!permissions.includes('calcPrayers(')&&!permissions.includes('sunPos(')&&!permissions.includes('moonPos('),'Startup integration must not alter or duplicate Qibla, WMM, prayer, Falaki or raw astronomical equations');
 
 const ctx={console,CustomEvent:function(){},dispatchEvent(){},QiblaPrayerMethods:{methods:{
  mwl:{label:'رابطة العالم الإسلامي (MWL)'},egyptian:{label:'الهيئة المصرية العامة للمساحة'},ummAlQura:{label:'أم القرى — مكة'},karachi:{label:'جامعة العلوم الإسلامية — كراتشي'},isna:{label:'ISNA — أمريكا الشمالية'},singapore:{label:'سنغافورة / ماليزيا / إندونيسيا'},kuwait:{label:'الكويت'},qatar:{label:'قطر'}
@@ -105,6 +109,6 @@ const bridge=read('js/i18n/internal-screen-language-bridge.js');
 assert(bridge.includes('MIZAN_PRAYER_SETTINGS_DYNAMIC_TRANSLATE'),'Internal language bridge must consume prayer dynamic translator');
 assert(bridge.includes('prayer-settings-complete-phrases.js'),'Prayer dynamic translation bundle must load');
 console.log('A2 phone UI regression gate: PASS');
-console.log('GNSS startup lifecycle: granted-permission auto-start + bounded transient retries + foreground recovery: PASS');
-console.log('GNSS safety: trusted finite device fix required; no IP fallback and no duplicated prayer/Falaki/verification engines: PASS');
+console.log('GNSS production startup: existing inline engine + permission-gated bounded recovery + foreground resume: PASS');
+console.log('GNSS safety: no duplicate engine and no Qibla/WMM/prayer/Falaki/raw-equation changes in startup integration: PASS');
 console.log('Home rows / astronomy icon / lowered compass dashboards / GNSS surface / persistent Prayer settings and bindings: PASS');
