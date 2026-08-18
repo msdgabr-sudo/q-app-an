@@ -1,0 +1,45 @@
+name: Android Location service cycle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'source/js/presentation/location-service-control.js'
+      - 'source/js/presentation/bootstrap.js'
+      - 'source/android-twa/native/prayer-widget/NativeLocationState.java'
+      - 'source/android-twa/native/prayer-widget/LocationSettingsActivity.java'
+      - 'source/android-twa/native/prayer-widget/QiblaLauncherActivity.java'
+      - 'source/android-twa/apply_native_widget.ps1'
+      - 'source/android-twa/check_generated_permissions.py'
+      - 'source/tests/location-service-cycle.test.js'
+      - '.github/workflows/android-location-service-cycle.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'source/js/presentation/location-service-control.js'
+      - 'source/js/presentation/bootstrap.js'
+      - 'source/android-twa/native/prayer-widget/NativeLocationState.java'
+      - 'source/android-twa/native/prayer-widget/LocationSettingsActivity.java'
+      - 'source/android-twa/native/prayer-widget/QiblaLauncherActivity.java'
+      - 'source/android-twa/apply_native_widget.ps1'
+      - 'source/android-twa/check_generated_permissions.py'
+      - 'source/tests/location-service-cycle.test.js'
+      - '.github/workflows/android-location-service-cycle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  location-service-cycle:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: source
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Verify Android Location service recovery contract
+        run: node tests/location-service-cycle.test.js
