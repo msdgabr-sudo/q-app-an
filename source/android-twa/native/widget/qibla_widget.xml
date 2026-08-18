@@ -4,73 +4,176 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center_vertical"
-    android:padding="16dp"
-    android:background="#101820">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/widget_app_name"
-        android:textStyle="bold"
-        android:textSize="14sp"
-        android:textColor="#E8C878" />
-
-    <TextView
-        android:id="@+id/widget_city"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:text="@string/widget_city_unavailable"
-        android:textSize="12sp"
-        android:textColor="#AFC0D6"
-        android:gravity="end"
-        android:maxLines="1"
-        android:ellipsize="end" />
-
-    <TextView
-        android:id="@+id/widget_next_prayer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/widget_refresh_required"
-        android:textStyle="bold"
-        android:textSize="18sp"
-        android:textColor="#FFFFFF"
-        android:gravity="end" />
-
-    <TextView
-        android:id="@+id/widget_prayer_time"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/widget_value_unavailable"
-        android:textSize="14sp"
-        android:textColor="#DCE5EE"
-        android:gravity="end" />
+    android:padding="9dp"
+    android:layoutDirection="locale"
+    android:background="@drawable/qibla_widget_bg">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:baselineAligned="false">
 
         <TextView
-            android:id="@+id/widget_hijri"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/widget_value_unavailable"
-            android:textSize="12sp"
-            android:textColor="#AFC0D6" />
-
-        <TextView
-            android:id="@+id/widget_qibla"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/widget_qibla_unavailable"
+            android:text="@string/widget_app_name"
             android:textStyle="bold"
             android:textSize="13sp"
-            android:textColor="#FFFFFF" />
+            android:textColor="#F0CF82"
+            android:maxLines="1" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.45"
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <TextView
+                android:id="@+id/widget_city"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_location_unavailable_short"
+                android:textSize="9sp"
+                android:textColor="#D8E1EC"
+                android:gravity="end"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/widget_hijri"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="@string/widget_value_unavailable"
+                android:textSize="8sp"
+                android:textColor="#8195AB"
+                android:gravity="end"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="9dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/qibla_widget_panel">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_next_prayer_label"
+                android:textSize="8sp"
+                android:textColor="#90A7BD" />
+
+            <TextView
+                android:id="@+id/widget_next_prayer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="@string/widget_refresh_required"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:textColor="#FFFFFF"
+                android:maxLines="1" />
+
+            <TextView
+                android:id="@+id/widget_prayer_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_value_unavailable"
+                android:textStyle="bold"
+                android:textSize="19sp"
+                android:textColor="#72E59E"
+                android:maxLines="1" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="9dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/qibla_widget_panel_gold">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_qibla_label"
+                android:textSize="8sp"
+                android:textColor="#BBAA80"
+                android:gravity="end" />
+
+            <TextView
+                android:id="@+id/widget_qibla"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="@string/widget_qibla_unavailable"
+                android:textStyle="bold"
+                android:textSize="21sp"
+                android:textColor="#F0C56A"
+                android:gravity="end"
+                android:maxLines="1" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_true_north"
+                android:textSize="7sp"
+                android:textColor="#71869C"
+                android:gravity="end"
+                android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="4dp"
+        android:paddingVertical="4dp"
+        android:background="@drawable/qibla_widget_strip"
+        android:baselineAligned="false">
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+            <TextView android:id="@+id/widget_fajr_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="7sp" android:textColor="#AFC0D6" android:maxLines="1" />
+            <TextView android:id="@+id/widget_fajr_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="8sp" android:textStyle="bold" android:textColor="#DCE5EE" android:maxLines="1" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+            <TextView android:id="@+id/widget_dhuhr_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="7sp" android:textColor="#AFC0D6" android:maxLines="1" />
+            <TextView android:id="@+id/widget_dhuhr_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="8sp" android:textStyle="bold" android:textColor="#DCE5EE" android:maxLines="1" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+            <TextView android:id="@+id/widget_asr_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="7sp" android:textColor="#AFC0D6" android:maxLines="1" />
+            <TextView android:id="@+id/widget_asr_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="8sp" android:textStyle="bold" android:textColor="#DCE5EE" android:maxLines="1" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+            <TextView android:id="@+id/widget_maghrib_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="7sp" android:textColor="#AFC0D6" android:maxLines="1" />
+            <TextView android:id="@+id/widget_maghrib_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="8sp" android:textStyle="bold" android:textColor="#DCE5EE" android:maxLines="1" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+            <TextView android:id="@+id/widget_isha_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="7sp" android:textColor="#AFC0D6" android:maxLines="1" />
+            <TextView android:id="@+id/widget_isha_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="8sp" android:textStyle="bold" android:textColor="#DCE5EE" android:maxLines="1" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
