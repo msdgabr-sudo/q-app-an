@@ -70,10 +70,10 @@ function GT(id){
   if(id!=='compass'&&window._gnssWatchId!=null){
     try{navigator.geolocation.clearWatch(window._gnssWatchId);window._gnssWatchId=null;}catch(e){}
   }
-  if(id==='compass'&&gnssSource==='default'){setTimeout(function(){tryBrowserGPS();},400);}
+  if(id==='compass'&&typeof gnssHasTrustedFix!=='undefined'&&!gnssHasTrustedFix){setTimeout(function(){tryBrowserGPS();},400);}
   if(id==='compass'){setTimeout(function(){var ds=gel('dev-slider');if(ds)ds.dispatchEvent(new Event('input'));},500);}
-  if(id==='gnss'){setTimeout(function(){if(gnssSource==='default')tryBrowserGPS();},300);}
-  if(id==='compass'||id==='gnss'){updateQiblaFromPosition();}
+  if(id==='gnss'){setTimeout(function(){if(typeof gnssHasTrustedFix!=='undefined'&&!gnssHasTrustedFix)tryBrowserGPS();},300);}
+  if((id==='compass'||id==='gnss')&&typeof gnssHasTrustedFix!=='undefined'&&gnssHasTrustedFix){updateQiblaFromPosition();}
   if(id==='quran'){_qrActive=true;try{qrInit();}catch(e){}}
   else{try{qrDeactivate();}catch(e){}}
   if(id==='serenity'){
