@@ -7,8 +7,10 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.format.DateFormat;
+import android.util.SizeF;
 import android.widget.RemoteViews;
 
 import com.qiblalabs.R;
@@ -16,6 +18,8 @@ import com.qiblalabs.nativebridge.PrayerNativeScheduler;
 import com.qiblalabs.nativebridge.PrayerNotificationReceiver;
 
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.TimeZone;
 
 /**
@@ -53,11 +57,23 @@ public final class QiblaWidgetProvider extends AppWidgetProvider {
     }
 
     private void updateOne(Context context, AppWidgetManager manager, int appWidgetId) {
-        manager.updateAppWidget(appWidgetId, buildViews(context, manager, appWidgetId));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            manager.updateAppWidget(appWidgetId, buildResponsiveViews(context));
+            return;
+        }
+        manager.updateAppWidget(appWidgetId, buildViews(context, modeForLegacyWidget(manager, appWidgetId)));
     }
 
-    private RemoteViews buildViews(Context context, AppWidgetManager manager, int appWidgetId) {
-        int mode = modeForWidget(manager, appWidgetId);
+    /** Android 12+ responsive size buckets recommended by the platform. */
+    private RemoteViews buildResponsiveViews(Context context) {
+        Map<SizeF, RemoteViews> viewMapping = new HashMap<>();
+        viewMapping.put(new SizeF(110f, 115f), buildViews(context, MODE_COMPACT));
+        viewMapping.put(new SizeF(245f, 115f), buildViews(context, MODE_MEDIUM));
+        viewMapping.put(new SizeF(245f, 185f), buildViews(context, MODE_LARGE));
+        return new RemoteViews(viewMapping);
+    }
+
+    private RemoteViews buildViews(Context context, int mode) {
         int layout = mode == MODE_COMPACT
                 ? R.layout.qibla_widget_compact
                 : mode == MODE_LARGE ? R.layout.qibla_widget_large : R.layout.qibla_widget;
@@ -68,6 +84,7 @@ public final class QiblaWidgetProvider extends AppWidgetProvider {
         String city = safeText(prefs.getString("city", ""), context.getString(R.string.widget_location_unavailable_short));
         String hijri = safeText(prefs.getString("hijri", ""), unavailable);
         String qibla = prefs.getString("qibla", "");
+        boolean qiblaReady = qibla != null && !qibla.trim().isEmpty();
 
         RemoteViews views = new RemoteViews(context.getPackageName(), layout);
         views.setTextViewText(R.id.widget_city, city);
@@ -77,9 +94,9 @@ public final class QiblaWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_prayer_time,
                 next < 0 ? unavailable : timeText(context, prefs, PrayerNativeScheduler.IDS[next]));
         views.setTextViewText(R.id.widget_qibla,
-                qibla == null || qibla.trim().isEmpty()
-                        ? context.getString(R.string.widget_qibla_unavailable)
-                        : context.getString(R.string.widget_qibla_degrees, qibla));
+                qiblaReady
+                        ? context.getString(R.string.widget_qibla_degrees, qibla)
+                        : mode == MODE_COMPACT ? context.getString(R.string.widget_qibla_unavailable) : unavailable);
         views.setTextViewText(R.id.widget_hijri, hijri);
 
         if (mode != MODE_COMPACT) bindPrayerStrip(context, views, prefs, next);
@@ -89,14 +106,15 @@ public final class QiblaWidgetProvider extends AppWidgetProvider {
         return views;
     }
 
-    private int modeForWidget(AppWidgetManager manager, int appWidgetId) {
+    /** Fallback sizing for Android 11 and earlier. */
+    private int modeForLegacyWidget(AppWidgetManager manager, int appWidgetId) {
         Bundle options = manager.getAppWidgetOptions(appWidgetId);
         int width = options == null ? 250 : options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
         int height = options == null ? 110 : options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110);
         if (width <= 0) width = 250;
         if (height <= 0) height = 110;
         if (width < 190) return MODE_COMPACT;
-        if (height >= 170) return MODE_LARGE;
+        if (height >= 180) return MODE_LARGE;
         return MODE_MEDIUM;
     }
 
