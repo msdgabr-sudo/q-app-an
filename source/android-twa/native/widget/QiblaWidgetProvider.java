@@ -67,9 +67,9 @@ public final class QiblaWidgetProvider extends AppWidgetProvider {
     /** Android 12+ responsive size buckets recommended by the platform. */
     private RemoteViews buildResponsiveViews(Context context) {
         Map<SizeF, RemoteViews> viewMapping = new HashMap<>();
-        viewMapping.put(new SizeF(110f, 115f), buildViews(context, MODE_COMPACT));
-        viewMapping.put(new SizeF(245f, 115f), buildViews(context, MODE_MEDIUM));
-        viewMapping.put(new SizeF(245f, 185f), buildViews(context, MODE_LARGE));
+        viewMapping.put(new SizeF(110f, 110f), buildViews(context, MODE_COMPACT));
+        viewMapping.put(new SizeF(245f, 110f), buildViews(context, MODE_MEDIUM));
+        viewMapping.put(new SizeF(245f, 180f), buildViews(context, MODE_LARGE));
         return new RemoteViews(viewMapping);
     }
 
