@@ -16,23 +16,6 @@ let gnssAccuracy = null;         // meters
 let gnssAltitudeMeters = 0;
 let gnssUpdating = false;
 let gnssHasTrustedFix = false;
-let _gnssRetryCount = 0;
-let _gnssRetryTimer = null;
-const _GNSS_RETRY_DELAYS = [1200, 3000, 6000];
-
-function _clearGnssRetry(){
-  if(_gnssRetryTimer!=null){try{clearTimeout(_gnssRetryTimer);}catch(e){} _gnssRetryTimer=null;}
-}
-function _publishGnssReady(){
-  try{window.dispatchEvent(new CustomEvent('qiblaastro:gnss-update',{detail:{source:'gps',trusted:true,accuracy:gnssAccuracy}}));}catch(e){}
-}
-function _scheduleGnssRetry(){
-  if(gnssHasTrustedFix||_gnssRetryCount>=_GNSS_RETRY_DELAYS.length)return;
-  if(document&&document.hidden)return;
-  _clearGnssRetry();
-  var delay=_GNSS_RETRY_DELAYS[_gnssRetryCount++];
-  _gnssRetryTimer=setTimeout(function(){_gnssRetryTimer=null;if(!gnssHasTrustedFix&&!gnssUpdating)tryBrowserGPS();},delay);
-}
 
 function showGnssUnavailable(message){
   gnssUpdating=false;
@@ -61,7 +44,7 @@ function showGnssUnavailable(message){
 
 function updateQiblaFromPosition(){
   // Never publish a Qibla/location update unless coordinates came from the device.
-  if(!gnssHasTrustedFix||gnssSource!=='gps'||!Number.isFinite(LAT)||!Number.isFinite(LON)){
+  if(!gnssHasTrustedFix||gnssSource!=='gps'){
     showGnssUnavailable();
     return;
   }
@@ -90,7 +73,6 @@ function updateQiblaFromPosition(){
   _el=document.getElementById('gnss-src');if(_el)_el.textContent=srcTxt;
   _el=document.getElementById('gnss-acc');if(_el)_el.textContent=acc?'~'+acc+'م':'---';
   _el=document.getElementById('gnss-qibla');if(_el)_el.textContent=QT.toFixed(2)+'° — '+qDir;
-  _publishGnssReady();
 }
 
 // Browser Geolocation uses the device location provider. On Android this may
@@ -118,10 +100,8 @@ function hideManualCal(){
 function tryBrowserGPS(){
   if(gnssUpdating)return;
   gnssUpdating=true;
-  _clearGnssRetry();
   set('compass-status-msg','⏳ جاري تحديث موقعك من GNSS...');
   set('gnss-btn-status','⏳ جاري التحديث...');
-  set('hm-gps-src','جاري تحديد الموقع...');
   var srcEl=document.getElementById('gnss-src');if(srcEl)srcEl.textContent='جاري طلب موقع جديد من الجهاز...';
 
   if(window._gnssWatchId != null){
@@ -139,7 +119,6 @@ function tryBrowserGPS(){
         try{
           if(!pos||!pos.coords||!Number.isFinite(pos.coords.latitude)||!Number.isFinite(pos.coords.longitude)){
             showGnssUnavailable();
-            _scheduleGnssRetry();
             return;
           }
           LAT=pos.coords.latitude;
@@ -149,8 +128,6 @@ function tryBrowserGPS(){
           gnssSource='gps';
           gnssHasTrustedFix=true;
           gnssUpdating=false;
-          _gnssRetryCount=0;
-          _clearGnssRetry();
           updateQiblaFromPosition();
           try{
             window._gnssWatchId = navigator.geolocation.watchPosition(
@@ -171,37 +148,16 @@ function tryBrowserGPS(){
               {enableHighAccuracy:true,timeout:30000,maximumAge:0}
             );
           }catch(e){}
-        }catch(e){ showGnssUnavailable(); _scheduleGnssRetry(); }
+        }catch(e){ showGnssUnavailable(); }
       },
       function(err){
         var msg='تعذر تحديد موقعك — فعّل الموقع وامنح الإذن ثم أعد المحاولة';
-        if(err&&err.code===1){msg='تم رفض إذن الموقع — امنح إذن الموقع ثم أعد المحاولة';showGnssUnavailable(msg);return;}
-        if(err&&err.code===3)msg='لم يصل تثبيت GPS بعد — جارٍ إعادة المحاولة تلقائيًا';
-        else if(err&&err.code===2)msg='إشارة الموقع غير متاحة مؤقتًا — جارٍ إعادة المحاولة تلقائيًا';
+        if(err&&err.code===1)msg='تم رفض إذن الموقع — امنح إذن الموقع ثم أعد المحاولة';
         showGnssUnavailable(msg);
-        _scheduleGnssRetry();
       },
-      {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+      {enableHighAccuracy:true,timeout:10000,maximumAge:0}
     );
-  }catch(e){ showGnssUnavailable(); _scheduleGnssRetry(); }
-}
-
-function _startTrustedGnssIfAllowed(){
-  if(gnssHasTrustedFix||gnssUpdating)return;
-  function start(){if(!gnssHasTrustedFix&&!gnssUpdating)tryBrowserGPS();}
-  try{
-    if(navigator.permissions&&typeof navigator.permissions.query==='function'){
-      navigator.permissions.query({name:'geolocation'}).then(function(status){
-        if(!status)return;
-        if(status.state==='granted')start();
-        if(typeof status.addEventListener==='function')status.addEventListener('change',function(){if(status.state==='granted')start();});
-      }).catch(function(){
-        try{var s=JSON.parse(localStorage.getItem('qiblaastro:permissions-onboarding:v2')||'null');if(s&&s.completed&&s.location==='granted')start();}catch(_){}
-      });
-      return;
-    }
-  }catch(_){ }
-  try{var saved=JSON.parse(localStorage.getItem('qiblaastro:permissions-onboarding:v2')||'null');if(saved&&saved.completed&&saved.location==='granted')start();}catch(_){ }
+  }catch(e){ showGnssUnavailable(); }
 }
 
 // Compatibility alias only. It deliberately does NOT perform IP geolocation.
@@ -212,11 +168,4 @@ function tryIPGeo(){
 window.tryBrowserGPS = tryBrowserGPS;
 window.tryIPGeo      = tryIPGeo;
 
-// Restore the existing trusted GNSS cycle on every app start once permission is
-// already granted. First-run prompting remains owned by permissions-onboarding.js.
-(function installGnssLifecycle(){
-  function onReady(){_startTrustedGnssIfAllowed();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',onReady,{once:true});else onReady();
-  window.addEventListener('focus',_startTrustedGnssIfAllowed);
-  document.addEventListener('visibilitychange',function(){if(!document.hidden)_startTrustedGnssIfAllowed();});
-})();
+// GPS is requested after user interaction by the existing activation flow.
