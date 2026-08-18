@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_app_name">QiblaAstro</string>
+    <string name="widget_description">Waktu salat dan arah Kiblat sekilas</string>
     <string name="widget_city_unavailable">Buka aplikasi untuk mendeteksi kota</string>
+    <string name="widget_location_unavailable_short">Lokasi belum ditetapkan</string>
     <string name="widget_refresh_required">Buka aplikasi untuk memperbarui</string>
     <string name="widget_value_unavailable">—</string>
+    <string name="widget_next_prayer_label">Salat berikutnya</string>
+    <string name="widget_qibla_label">Arah Kiblat</string>
+    <string name="widget_true_north">Dari utara sejati</string>
     <string name="widget_qibla_unavailable">Kiblat —</string>
     <string name="widget_qibla_value">Kiblat %1$s°</string>
+    <string name="widget_qibla_degrees">%1$s°</string>
+    <string name="widget_updated_value">Diperbarui %1$s</string>
 </resources>
