@@ -21,13 +21,19 @@ assert.strictEqual(twa.features&&twa.features.locationDelegation&&twa.features.l
 assert.strictEqual(twa.enableNotifications,true,'TWA notifications must stay enabled');
 assert(nativeActivity.includes('POST_NOTIFICATIONS'),'Native prayer bridge must request Android 13+ notification permission');
 assert(nativeActivity.includes('PrayerNativeScheduler.reschedule(this)'),'Native prayer bridge must persist and schedule received prayer data');
+assert(nativeActivity.includes('requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},REQ_NOTIFICATIONS);'),'Android 13+ permission dialog must be owned by the native bridge Activity');
+assert(nativeActivity.includes('grantResults[0]==PackageManager.PERMISSION_GRANTED'),'Native bridge must inspect the actual Android permission result');
+assert(nativeActivity.includes('if(authenticated(data))apply(data);'),'Prayer schedule must only be persisted after Android grants the requested notification permission');
+const requestPos=nativeActivity.indexOf('requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},REQ_NOTIFICATIONS);');
+const firstApplyPos=nativeActivity.indexOf('        apply(data);');
+assert(requestPos>=0&&firstApplyPos>requestPos,'Native Activity must request POST_NOTIFICATIONS before applying/scheduling an enabled Adhan plan');
 
 // First-run permission must never remain indefinitely disabled waiting for a GPS fix.
 assert(permissions.includes('getLocationPermissionStatus'),'Permission flow must observe the browser/TWA geolocation permission state');
 assert(permissions.includes('timer=root.setTimeout(settleFromPermission,10000)'),'Permission request needs an independent bounded safety timeout');
 assert(permissions.includes('enableHighAccuracy:false'),'Permission prompting must be separate from the later trusted high-accuracy GNSS acquisition');
 assert(permissions.includes('maximumAge:60000'),'Permission prompting may use a non-authoritative cached location only to settle the permission dialog');
-assert(permissions.includes("finish('prompt')"),'An unresolved Android permission dialog must return control to the UI instead of hanging');
+assert(permissions.includes("finish('prompt')"),'An unresolved Android location permission dialog must return control to the UI instead of hanging');
 assert(permissions.includes("if(saved&&saved.location==='granted')permission='granted'"),'GNSS startup recovery must honor a granted permission even before onboarding is fully completed');
 
 // Existing trusted GNSS engine remains authoritative; no replacement engine or fallback location.
@@ -42,11 +48,21 @@ assert(nav.includes("&&gnssHasTrustedFix){updateQiblaFromPosition();}"),'Navigat
 for(const forbidden of ['calcQibla(','refreshMdeclFromTrustedGnss(','calcPrayers(','sunPos(','moonPos(','AstroVerification']){
   assert(!permissions.includes(forbidden),`Permissions integration must not touch protected calculation token: ${forbidden}`);
 }
+assert(bootstrap.includes("css/compass-confidence-final.css?v=20260809-reference-ui1"),'Adhan permission-cycle work must not alter the existing compass confidence asset contract');
 
-// Prayer runtime must still be the only owner of prayer schedule calculation.
+// Prayer runtime remains the only owner of prayer calculations. Native bridge boot is independent of prayer presentation mounting.
 assert(runtime.includes('QiblaPrayerMethods.calculate'),'Prayer runtime must retain the approved prayer calculation engine');
 assert(permissions.includes('prayerRuntimeReady()'),'Onboarding may inspect readiness but must not calculate prayer times');
 assert(sync.includes('QiblaPrayerNativePlan.build(14)'),'Native prayer handoff must retain the validated dated plan');
+assert(bootstrap.includes('function captureNativeTokenEarly()'),'Bootstrap must capture the native per-install token before delayed page modules');
+assert(bootstrap.includes("root.sessionStorage.setItem(NATIVE_TOKEN_KEY,token)"),'Early token capture must persist into the same session key consumed by schedule-sync');
+assert(bootstrap.includes('function loadPrayerCore(onready)'),'Native prayer bridge must have a dedicated core loader');
+assert(bootstrap.includes('loadPrayerCore(loadPermissions);'),'Permissions onboarding must start only after the existing native prayer core is loaded');
+assert(bootstrap.includes("native-plan.js?v=20260818-adhan-core2")&&bootstrap.includes("adhan-ui.js?v=20260818-adhan-core2")&&bootstrap.includes("schedule-sync.js?v=20260818-adhan-core2"),'Native plan, Adhan state and Android sync must load as one early core');
+const mountPrayerPos=bootstrap.indexOf("loader.mount('prayer')");
+const coreDefinitionPos=bootstrap.indexOf('function loadPrayerCore(onready)');
+assert(coreDefinitionPos>=0&&mountPrayerPos>coreDefinitionPos,'Native bridge core must exist independently before prayer presentation mount');
+assert(!bootstrap.includes("loader.mount('prayer').then(function(){loadScript('js/presentation/prayer/schedule-sync.js"),'schedule-sync must no longer depend on successful prayer-screen presentation mounting');
 
 // Adhan activation is an explicit second user gesture and must not report success before Android takes focus.
 assert(permissions.includes("btn.dataset.stage='adhan'"),'Onboarding must expose an explicit Adhan activation stage');
@@ -67,14 +83,31 @@ assert(nativeScheduler.includes('AlarmManager.RTC_WAKEUP')&&nativeScheduler.incl
 assert(nativeScheduler.includes('PendingIntent.getBroadcast')&&nativeScheduler.includes('PrayerNotificationReceiver.class'),'Native Adhan delivery must remain BroadcastReceiver-based');
 assert(nativeReceiver.includes('USAGE_ALARM')&&nativeReceiver.includes('rawForAdhan'),'Native receiver must retain local Adhan alarm audio');
 
-// Cache-busting must force the repaired three-file cycle onto already-installed TWA clients.
-assert(bootstrap.includes('permissions-onboarding.js?v=20260818-location-adhan3'),'Bootstrap must request the repaired permissions cycle asset');
-assert(bootstrap.includes('schedule-sync.js?v=20260818-adhan-handoff1'),'Bootstrap must request the repaired Android handoff asset');
-assert(bootstrap.includes('adhan-ui.js?v=20260818-adhan-enable1'),'Bootstrap must request the Adhan master-enable API asset');
+// Cache-busting must force the repaired cycle onto already-installed TWA clients.
+assert(bootstrap.includes('permissions-onboarding.js?v=20260818-location-adhan4'),'Bootstrap must request the current permissions-cycle asset');
 assert(sw.includes("'./js/presentation/permissions-onboarding.js'"),'Permissions integration must stay in critical cache');
-assert(sw.includes("PERMISSIONS_RELEASE='location-adhan-cycle-20260818-v2'"),'Service worker must advertise the repaired permissions cycle release');
-assert(sw.includes("VERSION='qiblaastro-v6.17-adhan-permission-handoff'"),'Service worker version must force installed clients onto the repaired Adhan handoff code');
+assert(sw.includes("PERMISSIONS_RELEASE='location-adhan-cycle-20260818-v3'"),'Service worker must advertise the current permissions cycle release');
+assert(sw.includes("VERSION='qiblaastro-v6.18-adhan-early-native-bridge'"),'Service worker version must force installed clients onto the early native bridge boot');
 assert(!sw.includes("'./js/05-gnss.js'"),'Service worker must not activate the unused external GNSS implementation beside the production inline engine');
+
+// Behavioral regression: bootstrap captures the launcher token immediately, before DOMContentLoaded or prayer presentation fetches.
+function verifyEarlyTokenCapture(){
+  const data=new Map(),replacements=[];
+  const sessionStorage={getItem:k=>data.has(k)?data.get(k):null,setItem:(k,v)=>data.set(k,String(v))};
+  const token='T'.repeat(32);
+  const context={
+    console,URLSearchParams,sessionStorage,
+    location:{hash:'#nativeToken='+token,pathname:'/',search:'?twa=1'},
+    history:{state:{boot:true},replaceState(state,title,url){replacements.push({state,title,url});}},
+    document:{readyState:'loading',addEventListener(){},querySelector(){return null;},createElement(){return {setAttribute(){}};},head:{appendChild(){}},documentElement:{appendChild(){}}},
+    setTimeout(){return 1;},clearTimeout(){},globalThis:null,window:null
+  };
+  context.globalThis=context;context.window=context;
+  vm.createContext(context);vm.runInContext(bootstrap,context);
+  assert.strictEqual(sessionStorage.getItem('qiblaastro:native-token'),token,'bootstrap must preserve the per-install token before delayed loaders run');
+  assert.strictEqual(replacements.length,1,'bootstrap should clean the token from the visible fragment exactly once');
+  assert.strictEqual(replacements[0].url,'/?twa=1','bootstrap must clean the fragment without changing the TWA start URL');
+}
 
 // Behavioral regression: the onboarding path must enable Adhan, send notify=1 through
 // a package-targeted intent, and only resolve after Android/TWA focus transfer is observed.
@@ -110,8 +143,9 @@ async function verifyConfirmedNativeHandoff(){
   assert(assigned.includes('notify=1'),'native payload must request notification permission/Adhan activation');
 }
 
+verifyEarlyTokenCapture();
 verifyConfirmedNativeHandoff().then(()=>{
-  console.log('Permissions cycle: bounded Android location request -> trusted existing GNSS -> prayer runtime readiness: PASS');
-  console.log('Adhan cycle: explicit user activation -> confirmed package-targeted Android handoff -> RTC_WAKEUP local Adhan: PASS');
-  console.log('Safety: no false ready state, no silent success before Android focus transfer, and no protected calculation changes: PASS');
+  console.log('Permissions cycle: early native token/core -> bounded Android location -> trusted GNSS -> prayer runtime readiness: PASS');
+  console.log('Adhan cycle: user activation -> native Android POST_NOTIFICATIONS gate -> authenticated schedule handoff -> RTC_WAKEUP local Adhan: PASS');
+  console.log('Safety: prayer presentation no longer gates the bridge; denied notification permission cannot schedule enabled Adhan; protected calculations unchanged: PASS');
 }).catch(err=>{console.error(err);process.exit(1);});
