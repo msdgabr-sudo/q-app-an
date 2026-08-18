@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_app_name">QiblaAstro</string>
+    <string name="widget_description">Horaires de prière et Qibla en un coup d’œil</string>
     <string name="widget_city_unavailable">Ouvrez l’application pour détecter la ville</string>
+    <string name="widget_location_unavailable_short">Position non définie</string>
     <string name="widget_refresh_required">Ouvrez l’application pour actualiser</string>
     <string name="widget_value_unavailable">—</string>
+    <string name="widget_next_prayer_label">Prochaine prière</string>
+    <string name="widget_qibla_label">Direction de la Qibla</string>
+    <string name="widget_true_north">Depuis le nord vrai</string>
     <string name="widget_qibla_unavailable">Qibla —</string>
     <string name="widget_qibla_value">Qibla %1$s°</string>
+    <string name="widget_qibla_degrees">%1$s°</string>
+    <string name="widget_updated_value">Actualisé %1$s</string>
 </resources>
