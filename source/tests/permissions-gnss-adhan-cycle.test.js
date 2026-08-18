@@ -118,9 +118,10 @@ const mountPrayerPos=bootstrap.indexOf("loader.mount('prayer')");
 const coreDefinitionPos=bootstrap.indexOf('function loadPrayerCore(onready)');
 assert(coreDefinitionPos>=0&&mountPrayerPos>coreDefinitionPos);
 
-// Cache release must evict the previous permission/Adhan bridge code.
-assert(sw.includes("VERSION='qiblaastro-v6.19-adhan-exact-native'"));
+// Cache release must retain the exact-Adhan bridge while evicting superseded code through the current v6.20 Azkar release.
+assert(sw.includes("VERSION='qiblaastro-v6.20-azkar-native-confirmed'"));
 assert(sw.includes("BRIDGE_RELEASE='prayer-exact-20260818-v1'"));
+assert(sw.includes("AZKAR_RELEASE='azkar-native-confirmed-20260818-v1'"));
 assert(sw.includes("PERMISSIONS_RELEASE='location-adhan-exact-cycle-20260818-v1'"));
 assert(sw.includes("'./js/presentation/prayer/native-plan.js'")&&sw.includes("'./js/presentation/prayer/schedule-sync.js'"));
 
