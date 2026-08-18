@@ -19,20 +19,30 @@ public final class PrayerWidgetSyncActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-        Uri data=getIntent()!=null?getIntent().getData():null;
-        if(!expected(data)||!NativeBridgeToken.valid(this,data.getQueryParameter("token"))){finish();return;}
-        apply(data);
-        if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED && "1".equals(data.getQueryParameter("notify"))){
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},REQ_NOTIFICATIONS);return;
+        Uri data=currentData();
+        if(!authenticated(data)){finish();return;}
+
+        boolean wantsNotifications="1".equals(data.getQueryParameter("notify"));
+        if(Build.VERSION.SDK_INT>=33 && wantsNotifications && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},REQ_NOTIFICATIONS);
+            return;
         }
+
+        apply(data);
         finish();
     }
 
     @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){
         super.onRequestPermissionsResult(requestCode,permissions,grantResults);
+        if(requestCode==REQ_NOTIFICATIONS && grantResults!=null && grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
+            Uri data=currentData();
+            if(authenticated(data))apply(data);
+        }
         finish();
     }
 
+    private Uri currentData(){return getIntent()!=null?getIntent().getData():null;}
+    private boolean authenticated(Uri data){return expected(data)&&NativeBridgeToken.valid(this,data.getQueryParameter("token"));}
     private boolean expected(Uri d){return d!=null&&"qiblaastro".equals(d.getScheme())&&"prayer-sync".equals(d.getHost());}
 
     private void apply(Uri d){
