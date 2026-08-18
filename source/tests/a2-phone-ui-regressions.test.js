@@ -16,6 +16,8 @@ assert(nav.includes("requestAnimationFrame(function()"),'Navigation must repeat 
 assert(nav.includes("qiblaastro:navigation-change"),'Navigation must publish one stable page-change event');
 assert(nav.includes("classList.remove('qa-astro-fullscreen-mode')"),'Compass fullscreen state must not leak into Home');
 assert(nav.includes("setAttribute('data-qa-active-page',id)"),'Navigation must synchronously publish the active route for isolated overlays');
+assert(!nav.includes("gnssSource==='default'")&&!nav.includes('gnssSource==="default"'),'Navigation must not retain the obsolete default GNSS source state');
+assert(nav.includes("!gnssHasTrustedFix")&&nav.includes("gnssHasTrustedFix){updateQiblaFromPosition()"),'Navigation GNSS fallback must use the trusted-fix state, not a retired source name');
 
 const pageCss=read('css/07-pages.css');
 assert(pageCss.includes('#qa-compass-home-button')&&pageCss.includes('+ 46px'),'Compass Home control must remain independently raised at the approved phone position');
@@ -77,6 +79,16 @@ const gnss=read('js/05-gnss.js');
 assert((gnss.match(/maximumAge:0/g)||[]).length>=2,'GNSS manual refresh/watch must request fresh device fixes');
 assert(!/fetch\s*\(|ipapi|ipinfo|geolocation-db/i.test(gnss),'GNSS policy must not call IP/external geolocation');
 assert(gnss.includes("gnssUpdating=true")&&gnss.includes("gnssUpdating=false"),'GNSS refresh busy state missing');
+assert(gnss.includes('function _startTrustedGnssIfAllowed()'),'GNSS must restore the existing trusted-device cycle on app startup');
+assert(gnss.includes("navigator.permissions.query({name:'geolocation'})")&&gnss.includes("status.state==='granted'"),'GNSS startup must only auto-start after the existing location permission is granted');
+assert(gnss.includes("'qiblaastro:permissions-onboarding:v2'")&&gnss.includes("s.location==='granted'"),'GNSS startup must retain a safe fallback to the existing onboarding grant state');
+assert(gnss.includes('const _GNSS_RETRY_DELAYS = [1200, 3000, 6000]'),'GNSS transient failure retry must be bounded and deterministic');
+assert(gnss.includes("if(err&&err.code===1){")&&gnss.includes("showGnssUnavailable(msg);return;"),'Permission denial must fail closed without an automatic retry loop');
+assert(gnss.includes("if(err&&err.code===3)")&&gnss.includes("else if(err&&err.code===2)")&&gnss.includes('_scheduleGnssRetry();'),'GNSS timeout/unavailable failures must recover with bounded retries');
+assert(gnss.includes("window.addEventListener('focus',_startTrustedGnssIfAllowed)")&&gnss.includes("visibilitychange"),'GNSS must recover when the installed app returns to foreground');
+assert(gnss.includes("qiblaastro:gnss-update")&&gnss.includes("trusted:true"),'A trusted fix must publish the existing GNSS-ready integration event');
+assert(gnss.includes("!gnssHasTrustedFix||gnssSource!=='gps'||!Number.isFinite(LAT)||!Number.isFinite(LON)"),'GNSS-dependent Qibla publication must remain fail-closed until finite trusted device coordinates exist');
+assert(!gnss.includes('calcPrayers(')&&!gnss.includes('sunPos(')&&!gnss.includes('moonPos(')&&!gnss.includes('AstroVerification'),'GNSS lifecycle fix must not duplicate prayer/Falaki/astronomical-verification engines');
 
 const ctx={console,CustomEvent:function(){},dispatchEvent(){},QiblaPrayerMethods:{methods:{
  mwl:{label:'رابطة العالم الإسلامي (MWL)'},egyptian:{label:'الهيئة المصرية العامة للمساحة'},ummAlQura:{label:'أم القرى — مكة'},karachi:{label:'جامعة العلوم الإسلامية — كراتشي'},isna:{label:'ISNA — أمريكا الشمالية'},singapore:{label:'سنغافورة / ماليزيا / إندونيسيا'},kuwait:{label:'الكويت'},qatar:{label:'قطر'}
@@ -93,4 +105,6 @@ const bridge=read('js/i18n/internal-screen-language-bridge.js');
 assert(bridge.includes('MIZAN_PRAYER_SETTINGS_DYNAMIC_TRANSLATE'),'Internal language bridge must consume prayer dynamic translator');
 assert(bridge.includes('prayer-settings-complete-phrases.js'),'Prayer dynamic translation bundle must load');
 console.log('A2 phone UI regression gate: PASS');
+console.log('GNSS startup lifecycle: granted-permission auto-start + bounded transient retries + foreground recovery: PASS');
+console.log('GNSS safety: trusted finite device fix required; no IP fallback and no duplicated prayer/Falaki/verification engines: PASS');
 console.log('Home rows / astronomy icon / lowered compass dashboards / GNSS surface / persistent Prayer settings and bindings: PASS');
