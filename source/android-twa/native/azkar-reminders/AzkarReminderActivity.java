@@ -100,8 +100,9 @@ public final class AzkarReminderActivity extends Activity {
 
     private boolean notificationsEnabled() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return true;
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.N || manager == null || manager.areNotificationsEnabled();
+        return manager != null && manager.areNotificationsEnabled();
     }
 
     private void openAppNotificationSettings() {
