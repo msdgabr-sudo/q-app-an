@@ -62,11 +62,14 @@ assert(scheduler.includes('PendingIntent.getBroadcast')&&scheduler.includes('Pra
 assert(scheduler.includes('PRE_REQ')&&scheduler.includes('boolean pre'));
 assert(scheduler.includes('KEY_PLAN = "plan_v1"'));
 assert(scheduler.includes('KEY_NATIVE_ACTIVE = "native_active_v1"'));
+assert(scheduler.includes('scheduledPrayerCount>0'),'exhausted dated plan must not remain falsely owned by Native');
 assert(scheduler.includes('nextPlannedOccurrence(plan, i, now, tz)'));
-assert(scheduler.includes('if (actual <= 0L) continue;'),'exhausted dated plan must fail closed');
+assert(scheduler.includes('if (actual <= 0L) continue;'),'an exhausted date-stamped prayer must not replay stale daily minutes');
 assert(receiver.includes('extends BroadcastReceiver'));
 assert(receiver.includes('show(context,id,mode,pre);')&&receiver.includes('PrayerNativeScheduler.reschedule(context);'));
-assert(receiver.includes('USAGE_ALARM')&&receiver.includes('rawForAdhan'));
+assert(receiver.includes('USAGE_ALARM')&&receiver.includes('rawNameForAdhan'));
+assert(receiver.includes('"/raw/"+rawName'),'notification sound URI must use stable raw resource name rather than numeric resource id');
+assert(receiver.includes('_v2'),'code4 must use a fresh notification channel contract after the native upgrade');
 assert(prayerBoot.includes('ACTION_BOOT_COMPLETED')&&prayerBoot.includes('ACTION_MY_PACKAGE_REPLACED')&&prayerBoot.includes('ACTION_TIMEZONE_CHANGED')&&prayerBoot.includes('ACTION_TIME_CHANGED'));
 assert(prayerBoot.includes('ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED'),'granting exact access must restore schedule');
 for(const raw of ['adhan_mecca.mp3','adhan_ahmed_al_nufais.mp3','adhan_islam_sobhi.mp3','adhan_fajr.mp3'])assert(apply.includes(raw),`native Adhan package missing ${raw}`);
@@ -124,7 +127,7 @@ assert(sw.includes("qiblaastro-v6.19-adhan-exact-native"));
 assert(sw.includes('./js/presentation/prayer/native-plan.js')&&sw.includes('./js/presentation/prayer/schedule-sync.js')&&sw.includes('./js/azkar-native-reminders.js'));
 
 console.log('Native Android localization/security gate: PASS');
-console.log('Prayer: exact RTC_WAKEUP Adhan + separate inexact pre-alert + local audio: PASS');
+console.log('Prayer: exact RTC_WAKEUP Adhan + separate inexact pre-alert + stable local audio channel: PASS');
 console.log('Prayer: POST_NOTIFICATIONS + user-granted SCHEDULE_EXACT_ALARM + confirmed native ownership: PASS');
 console.log('Prayer: cached 180-day authoritative dated plan + reboot/time/exact-permission restoration: PASS');
 console.log('Azkar and widget authenticated/localized contracts: PASS');
