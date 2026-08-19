@@ -75,8 +75,9 @@ $launcher.SetAttribute('name',$androidNs,'com.qiblalabs.nativebridge.QiblaLaunch
 # It exposes no private token to the calling page and has no Google Play fallback.
 $hasBootstrap=$false
 foreach($filter in @($launcher.'intent-filter')){
-  foreach($data in @($filter.data)){
-    if($data.GetAttribute('scheme',$androidNs)-eq 'qiblaastro' -and $data.GetAttribute('host',$androidNs)-eq 'native-bootstrap'){$hasBootstrap=$true}
+  foreach($child in @($filter.ChildNodes)){
+    if($child.Name -ne 'data'){continue}
+    if($child.GetAttribute('scheme',$androidNs)-eq 'qiblaastro' -and $child.GetAttribute('host',$androidNs)-eq 'native-bootstrap'){$hasBootstrap=$true}
   }
 }
 if(-not $hasBootstrap){
