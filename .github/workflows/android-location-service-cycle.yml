@@ -2,8 +2,9 @@ name: Android Location service cycle
 
 on:
   push:
-    branches: [fix/trusted-gnss-location-cycle, main]
+    branches: [main]
     paths:
+      - 'source/service-worker.js'
       - 'source/js/presentation/location-service-control.js'
       - 'source/js/presentation/bootstrap.js'
       - 'source/android-twa/native/prayer-widget/NativeLocationState.java'
@@ -12,10 +13,12 @@ on:
       - 'source/android-twa/apply_native_widget.ps1'
       - 'source/android-twa/check_generated_permissions.py'
       - 'source/tests/location-service-cycle.test.js'
+      - 'source/tests/service-worker-location-refresh.test.js'
       - '.github/workflows/android-location-service-cycle.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'source/service-worker.js'
       - 'source/js/presentation/location-service-control.js'
       - 'source/js/presentation/bootstrap.js'
       - 'source/android-twa/native/prayer-widget/NativeLocationState.java'
@@ -24,6 +27,7 @@ on:
       - 'source/android-twa/apply_native_widget.ps1'
       - 'source/android-twa/check_generated_permissions.py'
       - 'source/tests/location-service-cycle.test.js'
+      - 'source/tests/service-worker-location-refresh.test.js'
       - '.github/workflows/android-location-service-cycle.yml'
   workflow_dispatch:
 
@@ -42,10 +46,14 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Syntax check Location service control
-        run: node --check js/presentation/location-service-control.js
+      - name: Syntax check Location service control and Service Worker
+        run: |
+          node --check js/presentation/location-service-control.js
+          node --check service-worker.js
       - name: Verify Android Location service recovery contract
         run: node tests/location-service-cycle.test.js
+      - name: Verify Service Worker Location refresh contract
+        run: node tests/service-worker-location-refresh.test.js
       - name: Verify existing Trusted GNSS runtime contract
         run: node tests/trusted-location-runtime-sync.test.js
       - name: Verify protected runtime boundaries
