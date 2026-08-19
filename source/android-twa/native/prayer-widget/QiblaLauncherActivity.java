@@ -10,7 +10,7 @@ import android.os.Build;
 
 import com.google.androidbrowserhelper.trusted.LauncherActivity;
 
-/** Adds the per-install secret plus confirmed Native Adhan/Azkar/Location state in the URL fragment only. */
+/** Adds the code5 capability marker plus per-install secret and confirmed Native state. */
 public final class QiblaLauncherActivity extends LauncherActivity {
     private static final String NATIVE_BRIDGE_VERSION = "5";
     private static final String AZKAR_PREFS = "qiblaastro_azkar_native";
@@ -41,8 +41,7 @@ public final class QiblaLauncherActivity extends LauncherActivity {
         if (azkarResult != null && !azkarResult.isEmpty()) azkar.edit().remove(AZKAR_LAST_RESULT).apply();
 
         StringBuilder fragment = new StringBuilder()
-                .append("nativeBridge=").append(NATIVE_BRIDGE_VERSION)
-                .append("&nativeToken=").append(Uri.encode(token))
+                .append("nativeToken=").append(Uri.encode(token))
                 .append("&nativeLocation=").append(nativeLocation ? "1" : "0")
                 .append("&nativeAdhan=").append(nativeAdhan ? "1" : "0")
                 .append("&nativeAzkar=").append(nativeAzkar ? "1" : "0")
@@ -50,7 +49,13 @@ public final class QiblaLauncherActivity extends LauncherActivity {
                 .append("&azkarPhrase=").append(Uri.encode(azkarPhrase));
         if (azkarResult != null && !azkarResult.isEmpty()) fragment.append("&azkarResult=").append(Uri.encode(azkarResult));
         if (!azkarIssue.isEmpty()) fragment.append("&azkarIssue=").append(Uri.encode(azkarIssue));
-        return base.buildUpon().fragment(fragment.toString()).build();
+
+        // Keep the capability marker in the query rather than the fragment so the web
+        // can distinguish code5 before invoking any code5-only custom-scheme route.
+        return base.buildUpon()
+                .appendQueryParameter("nativeBridge", NATIVE_BRIDGE_VERSION)
+                .fragment(fragment.toString())
+                .build();
     }
 
     private boolean appNotificationsEnabled() {
