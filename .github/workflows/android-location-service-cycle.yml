@@ -46,8 +46,8 @@ jobs:
         run: node --check js/presentation/location-service-control.js
       - name: Verify Android Location service recovery contract
         run: node tests/location-service-cycle.test.js
-      - name: Verify existing Trusted GNSS regression contract
-        run: node tests/permissions-gnss-adhan-cycle.test.js
+      - name: Verify existing Trusted GNSS runtime contract
+        run: node tests/trusted-location-runtime-sync.test.js
       - name: Verify protected runtime boundaries
         run: |
           node tests/wmm2025-runtime-integration.test.js
