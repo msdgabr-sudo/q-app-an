@@ -114,7 +114,12 @@ function requestLocation(){
     timer=root.setTimeout(settleFromObservedPermission,10000);
     try{
       root.navigator.geolocation.getCurrentPosition(
-        function(){finish('granted');},
+        function(pos){
+          try{
+            if(typeof root.acceptTrustedGnssPosition==='function'&&root.acceptTrustedGnssPosition(pos)!==true){finish('unavailable');return;}
+          }catch(_){finish('unavailable');return;}
+          finish('granted');
+        },
         function(err){
           if(err&&err.code===1){finish('denied');return;}
           /* A slow or temporarily unavailable fix is not a permission denial.

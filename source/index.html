@@ -1349,7 +1349,67 @@ let gnssAltitudeMeters = 0;
 let gnssUpdating = false;
 let gnssHasTrustedFix = false;
 
+function hasTrustedGnssCoordinates(){
+  return gnssHasTrustedFix===true&&gnssSource==='gps'&&
+    Number.isFinite(Number(LAT))&&Number.isFinite(Number(LON))&&
+    Number(LAT)>=-90&&Number(LAT)<=90&&Number(LON)>=-180&&Number(LON)<=180;
+}
+
+function publishHomeLocationPending(){
+  var label='جاري تحديد الموقع';
+  set('hm-qibla-deg',label);
+  set('hm-prayer-name','الصلاة القادمة');
+  set('hm-prayer-time','--:--');
+  set('hm-prayer-eta','');
+  var bearing=document.getElementById('qaBearing');
+  if(bearing){
+    bearing.textContent=label;
+    bearing.style.setProperty('font-size','.78rem','important');
+    bearing.style.setProperty('letter-spacing','0','important');
+    bearing.style.setProperty('white-space','nowrap','important');
+  }
+  var prayerTime=document.getElementById('qaPrayerTime');if(prayerTime)prayerTime.textContent='--:--';
+  var prayerEta=document.getElementById('qaPrayerEta');if(prayerEta)prayerEta.textContent='';
+  var sun=document.getElementById('qaSun');if(sun&&!Number.isFinite(Number.parseFloat(sun.textContent)))sun.textContent='--°';
+  var moon=document.getElementById('qaMoon');if(moon&&!Number.isFinite(Number.parseFloat(moon.textContent)))moon.textContent='--%';
+}
+
+function publishHomeQibla(value){
+  if(!Number.isFinite(Number(value))){publishHomeLocationPending();return;}
+  var text=Number(value).toFixed(1)+'°';
+  set('hm-qibla-deg',text);
+  var bearing=document.getElementById('qaBearing');
+  if(bearing){
+    bearing.textContent=text;
+    bearing.style.removeProperty('font-size');
+    bearing.style.removeProperty('letter-spacing');
+    bearing.style.removeProperty('white-space');
+  }
+}
+
+function invalidateLocationDependentCaches(){
+  try{eCache=null;eKey='';}catch(e){}
+  try{pCache=null;pKey='';}catch(e){}
+}
+
+function acceptTrustedGnssPosition(pos){
+  var c=pos&&pos.coords,lat=c&&Number(c.latitude),lon=c&&Number(c.longitude);
+  if(!c||!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180)return false;
+  LAT=lat;
+  LON=lon;
+  gnssAccuracy=Number.isFinite(Number(c.accuracy))?Number(c.accuracy):null;
+  gnssAltitudeMeters=Number.isFinite(Number(c.altitude))?Number(c.altitude):0;
+  gnssSource='gps';
+  gnssHasTrustedFix=true;
+  gnssUpdating=false;
+  invalidateLocationDependentCaches();
+  updateQiblaFromPosition();
+  try{window.dispatchEvent(new CustomEvent('qiblaastro:gnss-update',{detail:{source:'gps',latitude:LAT,longitude:LON,accuracy:gnssAccuracy}}));}catch(e){}
+  return true;
+}
+
 function showGnssUnavailable(message){
+  gnssUpdating=false;
   gnssSource='unresolved';
   gnssAccuracy=null;
   gnssHasTrustedFix=false;
@@ -1371,6 +1431,7 @@ function showGnssUnavailable(message){
   var el;
   el=document.getElementById('gnss-src');if(el)el.textContent='لم يتم الحصول على GPS/GNSS موثوق';
   el=document.getElementById('gnss-acc');if(el)el.textContent='---';
+  publishHomeLocationPending();
 }
 
 function updateQiblaFromPosition(){
@@ -1378,11 +1439,10 @@ function updateQiblaFromPosition(){
     showGnssUnavailable();
     return;
   }
-  if(!refreshMdeclFromTrustedGnss(new Date())){
-    set('mag-d',MDECL_STATUS==='blackout'?'⚠ مجال مغناطيسي ضعيف':'---');
-    return;
-  }
-  QT=calcQibla(LAT,LON); QM=((QT-MDECL)+360)%360;
+  QT=calcQibla(LAT,LON);
+  if(!Number.isFinite(Number(QT))){showGnssUnavailable();return;}
+  var magneticReady=refreshMdeclFromTrustedGnss(new Date());
+  if(magneticReady)QM=((QT-MDECL)+360)%360;else QM=QT;
   var dirs=['شمال','شمال شرق','شرق','جنوب شرق','جنوب','جنوب غرب','غرب','شمال غرب'];
   var qDir=dirs[Math.round(((QT%360)+360)/45)%8];
   var acc=gnssAccuracy?Math.round(gnssAccuracy):0;
@@ -1394,8 +1454,8 @@ function updateQiblaFromPosition(){
   set('gnss-badge',srcBadge);
   set('gnss-btn-status','✓ GPS '+acc+'م');
   set('compass-status-msg',srcBadge+' · '+QT.toFixed(1)+'° '+qDir);
-  set('mag-d',(MDECL>=0?'+':'')+MDECL.toFixed(2)+'°');
-  set('hm-qibla-deg',QT.toFixed(1)+'°');
+  set('mag-d',magneticReady?(MDECL>=0?'+':'')+MDECL.toFixed(2)+'°':(MDECL_STATUS==='blackout'?'⚠ مجال مغناطيسي ضعيف':'---'));
+  publishHomeQibla(QT);
   set('hm-gps-src',srcBadge);
   var _el;
   _el=document.getElementById('gnss-lat');if(_el)_el.textContent=LAT.toFixed(6)+'° N';
@@ -1428,6 +1488,9 @@ function hideManualCal(){
 }
 
 function tryBrowserGPS(){
+  if(gnssUpdating)return;
+  var hadTrustedFix=hasTrustedGnssCoordinates();
+  gnssUpdating=true;
   set('compass-status-msg','⏳ جاري تحديد موقعك...');
   set('gnss-btn-status','⏳ جاري...');
 
@@ -1445,30 +1508,17 @@ function tryBrowserGPS(){
     navigator.geolocation.getCurrentPosition(
       function(pos){
         try{
-          if(!pos||!pos.coords||!Number.isFinite(pos.coords.latitude)||!Number.isFinite(pos.coords.longitude)){
+          if(!acceptTrustedGnssPosition(pos)){
             showGnssUnavailable();
             return;
           }
-          LAT=pos.coords.latitude;
-          LON=pos.coords.longitude;
-          gnssAccuracy=pos.coords.accuracy;
-          gnssAltitudeMeters=Number.isFinite(pos.coords.altitude)?pos.coords.altitude:0;
-          gnssSource='gps';
-          gnssHasTrustedFix=true;
-          updateQiblaFromPosition();
           // watchPosition لتحسين الدقة — مع حفظ ID للإيقاف
           try{
             window._gnssWatchId = navigator.geolocation.watchPosition(
               function(p2){
                 try{
                   if(p2&&p2.coords&&Number.isFinite(p2.coords.latitude)&&Number.isFinite(p2.coords.longitude)&&p2.coords.accuracy<(gnssAccuracy||9999)){
-                    LAT=p2.coords.latitude;
-                    LON=p2.coords.longitude;
-                    gnssAccuracy=p2.coords.accuracy;
-                    gnssAltitudeMeters=Number.isFinite(p2.coords.altitude)?p2.coords.altitude:0;
-                    gnssSource='gps';
-                    gnssHasTrustedFix=true;
-                    updateQiblaFromPosition();
+                    acceptTrustedGnssPosition(p2);
                   }
                 }catch(e){}
               },
@@ -1479,6 +1529,11 @@ function tryBrowserGPS(){
         }catch(e){ showGnssUnavailable(); }
       },
       function(err){
+        gnssUpdating=false;
+        if(hadTrustedFix&&hasTrustedGnssCoordinates()){
+          updateQiblaFromPosition();
+          return;
+        }
         var msg='تعذر تحديد موقعك — فعّل الموقع وامنح الإذن ثم أعد المحاولة';
         if(err&&err.code===1)msg='تم رفض إذن الموقع — امنح إذن الموقع ثم أعد المحاولة';
         showGnssUnavailable(msg);
@@ -1496,6 +1551,7 @@ function tryIPGeo(){
 // Expose to global scope for HTML onclick handlers
 window.tryBrowserGPS = tryBrowserGPS;
 window.tryIPGeo      = tryIPGeo;
+window.acceptTrustedGnssPosition = acceptTrustedGnssPosition;
 
 // Start GNSS on load
 // GPS يُستدعى في activateCompass بعد تفاعل المستخدم
@@ -1835,12 +1891,17 @@ function phaseName(ill,elong){
   return'🌑 محاق';
 }
 function gel(id){return document.getElementById(id);}
+function safeDisplayValue(value){
+  if(typeof value==='number')return Number.isFinite(value)?value:'---';
+  return String(value==null?'':value).replace(/-?Infinity|NaN/g,'---');
+}
 function set(id,v){
+  v=safeDisplayValue(v);
   document.querySelectorAll('[id="'+id+'"]').forEach(function(e){
     e.textContent=v;
   });
 }
-function seti(id,v){const e=gel(id);if(e)e.innerHTML=v;}
+function seti(id,v){const e=gel(id);if(e)e.innerHTML=safeDisplayValue(v);}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // [JS-17] DIRECTION GRID
@@ -2583,13 +2644,28 @@ function updateSkyBackground(sp, now){
 let eCache=null,eKey='';
 let _lastSp=null,_lastMp=null;
 function loop(){
-  // أعد حساب القبلة من الإحداثيات الحالية
-  if(typeof calcQibla!=="undefined"){QT=calcQibla(LAT,LON);if(MDECL_READY)QM=((QT-MDECL)+360)%360;}
-
   tick++;
-  // Update prayer cache
-  
   const now=new Date();
+  if(!hasTrustedGnssCoordinates()){
+    set('top-time',now.toLocaleTimeString('ar-EG'));
+    publishHomeLocationPending();
+    set('prayer-location-label','جاري تحديد الموقع');
+    set('cal-qibla-from-north','---');
+    set('gnss-qibla','---');
+    set('cfg-qt','---');set('cfg-qm','---');set('cfg-md','---');
+    try{updateHome(null,null,null,now,null);}catch(e){}
+    setTimeout(loop,1000);
+    return;
+  }
+
+  // Recalculate only after a finite trusted Device GPS/GNSS position exists.
+  if(typeof calcQibla!=="undefined"){
+    var nextQT=calcQibla(LAT,LON);
+    if(!Number.isFinite(Number(nextQT))){showGnssUnavailable();setTimeout(loop,1000);return;}
+    QT=nextQT;if(MDECL_READY)QM=((QT-MDECL)+360)%360;
+  }
+
+  // Update prayer cache
   const dk=now.toDateString();
   if(dk!==eKey){eCache=solarEvts(now);eKey=dk;}
   const evts=eCache;
@@ -3500,7 +3576,9 @@ setTimeout(()=>{
 },1800);
 
 _safeOrient();
-_lastSp=sunPos(new Date());_lastMp=moonPos(new Date());
+if(hasTrustedGnssCoordinates()){
+  _lastSp=sunPos(new Date());_lastMp=moonPos(new Date());
+}
 
 // Dev slider event
 const devSlider = gel('dev-slider');
