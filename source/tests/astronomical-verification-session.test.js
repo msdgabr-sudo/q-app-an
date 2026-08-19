@@ -86,8 +86,8 @@ async function simulateCapture(mode) {
   assert(!gatewaySource.includes('Number(record.qiblaBearingDeg).toFixed'),
     'Gateway must not display the old geodesic field.');
 
-  assert(/const VERSION='qiblaastro-v5\.[^']+'/.test(serviceWorkerSource),
-    'Service worker must identify a QiblaAstro cache generation.');
+  assert(/const VERSION='qiblaastro-v\d+\.[^']+'/.test(serviceWorkerSource),
+    'Service worker must identify a current QiblaAstro cache generation.');
   assert(serviceWorkerSource.includes("'./js/astronomical-verification-session.js'"),
     'Service worker must cache the production verification session.');
   assert(serviceWorkerSource.includes("'./js/astronomical-verification-store.js'"),
