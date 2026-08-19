@@ -16,13 +16,16 @@ for (const forbidden of [
   'rawAstronomicalQiblaDeg',
   'relativeQiblaAngleDeg',
   'rawRelativeQiblaAngleDeg',
-  'ConfidenceFusionEngine',
-  'QiblaAstronomicalVerificationStore'
+  'ConfidenceFusionEngine'
 ]) {
   assert(!source.includes(forbidden), `Card runtime must not contain calculation or legacy token: ${forbidden}`);
 }
 assert(source.includes('CompassCards.getAllCards') || source.includes('Cards.getAllCards'),
   'Card runtime must read the canonical CompassCards view model.');
+assert(source.includes("loadScript('js/astronomical-verification-store.js"),
+  'Card runtime may load the persisted astronomical store before rendering cards.');
+assert(!/QiblaAstronomicalVerificationStore\s*\.\s*(?:record|reset|getLast|getStatus|createRecord)\s*\(/.test(source),
+  'Card runtime must not read, write, reset, validate or calculate scientific store state directly.');
 assert(source.includes("root._qiblaUpdateNewCards = updateCards"),
   'Legacy UI entry point must delegate to the standalone runtime temporarily.');
 
@@ -86,6 +89,8 @@ assert.strictEqual(cardModel.astroBody.cardLabel, 'البوصلة القمرية
 assert.strictEqual(cardModel.astroBody.value, '135.72°',
   'Astro body heading remains owned by the canonical CompassCards model.');
 assert.strictEqual(typeof intervalCallback, 'function', 'Runtime must schedule lightweight periodic UI refresh.');
+assert(appendedScripts.some(s => /astronomical-verification-store\.js/.test(s.src)),
+  'Runtime must request the persisted astronomical store module without consuming scientific state directly.');
 assert(appendedScripts.some(s => /post-verification-live-compass\.js/.test(s.src)),
   'Authoritative runtime must request the original post-verification live compass module.');
 
