@@ -2,6 +2,7 @@
 (function(){
   'use strict';
   var HOME_UI_RELEASE='mizan-home-20260814-phone-acceptance1';
+  var NATIVE_BRIDGE_RELEASE='20260819-native-bridge1';
   function forceFreshHomeLayout(){
     try{
       var link=document.querySelector('link[href^="css/home-action-layout-233.css"]');
@@ -11,7 +12,17 @@
   function requestServiceWorkerUpdate(){try{if('serviceWorker' in navigator){navigator.serviceWorker.getRegistration().then(function(reg){if(reg&&typeof reg.update==='function')return reg.update();}).catch(function(){});}}catch(_){ }}
   forceFreshHomeLayout();requestServiceWorkerUpdate();
   function loadPresentationBootstrap(){if(!document||document.querySelector('script[data-qibla-presentation-bootstrap]'))return;var s=document.createElement('script');s.src='js/presentation/bootstrap.js?v='+encodeURIComponent(HOME_UI_RELEASE);s.async=false;s.setAttribute('data-qibla-presentation-bootstrap','true');(document.head||document.documentElement).appendChild(s);}
-  loadPresentationBootstrap();
+  function loadNativeBridgeRecovery(onready){
+    if(!document){if(onready)onready();return;}
+    var existing=document.querySelector('script[data-qibla-native-bridge-recovery]');
+    if(existing){if(window.QiblaNativeBridgeRecovery){if(onready)onready();}else if(onready)existing.addEventListener('load',onready,{once:true});return;}
+    var s=document.createElement('script');s.src='js/presentation/native-bridge-recovery.js?v='+encodeURIComponent(NATIVE_BRIDGE_RELEASE);s.async=false;s.setAttribute('data-qibla-native-bridge-recovery','true');
+    if(onready){s.onload=onready;s.onerror=onready;}
+    (document.head||document.documentElement).appendChild(s);
+  }
+  // Capture the Android launch fragment before the delayed prayer/Azkar modules
+  // or any navigation layer can replace the hash. Only then start presentation bootstrap.
+  loadNativeBridgeRecovery(loadPresentationBootstrap);
   var kaaba='<svg class="qa-kaaba-inline" viewBox="0 0 520 520" role="img" aria-label="الكعبة المشرفة"><defs><linearGradient id="qaf" x1="0" x2="1"><stop stop-color="#050609"/><stop offset=".72" stop-color="#0b0c10"/><stop offset="1" stop-color="#17191f"/></linearGradient><linearGradient id="qas" x1="0" x2="1"><stop stop-color="#17191f"/><stop offset="1" stop-color="#050609"/></linearGradient><linearGradient id="qag" x1="0" x2="1"><stop stop-color="#936315"/><stop offset=".45" stop-color="#f3d379"/><stop offset="1" stop-color="#86570f"/></linearGradient></defs><ellipse cx="260" cy="467" rx="178" ry="25" fill="#e0ad43" opacity=".27"/><polygon points="112,120 356,84 356,422 112,452" fill="url(#qaf)"/><polygon points="356,84 430,126 430,392 356,422" fill="url(#qas)"/><polygon points="112,120 356,84 430,126 184,164" fill="#111217"/><polygon points="112,188 356,154 430,191 184,227" fill="url(#qag)"/><polygon points="112,229 356,195 430,230 430,240 356,207 112,242" fill="#efd178"/><rect x="326" y="231" width="62" height="132" rx="3" fill="url(#qag)"/><rect x="337" y="242" width="40" height="108" rx="2" fill="#bb8324"/><path d="M337 282h40M337 321h40M357 242v108" stroke="#755015" stroke-width="4"/><g fill="#e6c565"><rect x="145" y="198" width="56" height="14" rx="3"/><rect x="216" y="187" width="67" height="14" rx="3"/><rect x="298" y="175" width="39" height="14" rx="3"/><circle cx="133" cy="207" r="7"/><circle cx="347" cy="180" r="7"/></g><path d="M120 130l236-34v315l-236 30z" fill="none" stroke="#454953" stroke-opacity=".32" stroke-width="3"/></svg>';
   var hiddenNavs=[];
   function replaceSkyIcon(selector,src,alt){var orb=document.querySelector(selector);if(!orb)return false;var img=orb.querySelector('img.qa-sky-real-icon');if(!img){orb.textContent='';img=document.createElement('img');img.className='qa-sky-real-icon';img.alt=alt;img.decoding='async';img.draggable=false;img.style.cssText='display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;';orb.appendChild(img);}var expected=src+'?v='+HOME_UI_RELEASE;if(img.getAttribute('src')!==expected)img.setAttribute('src',expected);orb.style.setProperty('background','none','important');orb.style.setProperty('background-image','none','important');orb.style.setProperty('box-shadow','none','important');orb.style.setProperty('border','0','important');orb.style.setProperty('color','transparent','important');return true;}
