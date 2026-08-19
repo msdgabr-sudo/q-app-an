@@ -1,7 +1,7 @@
 name: Deploy app.qiblalabs.com
 
 # Active release: QiblaAstro 3.1.0 / Android versionCode 3.
-# Rollback deployment: restored the state before the GNSS display handoff.
+# Revert deployment: removed the attempted GNSS position handoff and restored the prior code-3 state.
 # This deployment must not publish the later code-4 native Location bridge assets.
 # Location onboarding must stay independent from Adhan notification permission.
 
