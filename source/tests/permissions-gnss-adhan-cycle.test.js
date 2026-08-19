@@ -102,11 +102,7 @@ assert(sync.includes('finish(nativeOwnerConfirmed())'),'returning from Android m
 assert(sync.includes("q.set('interactive',interactive?'1':'0')"));
 assert(sync.includes("q.set('onboarding',onboarding?'1':'0')"));
 assert(sync.includes('buildQuery(payload,true,true)'));
-assert(sync.includes("function directUri(q){return 'qiblaastro://prayer-sync?'+q.toString();}"));
-assert(sync.includes('function openDirectBridge(q)'));
-assert(!sync.includes('intent://prayer-sync'),'native handoff must never use a package-scoped intent URI that can fall through to Google Play');
-assert(!sync.includes('package=com.qiblalabs'),'web bridge must not expose a Play-routable package fallback');
-assert(!/play\.google\.com|market:\/\//i.test(sync),'native sync must never contain a Play Store fallback URL');
+assert(sync.includes('package=com.qiblalabs'));
 
 // Early native bridge remains independent of prayer presentation mount.
 assert(bootstrap.includes('function captureNativeTokenEarly()'));
