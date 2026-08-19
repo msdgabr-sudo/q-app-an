@@ -3,6 +3,8 @@ name: Verify prayer sync no-Play fix
 on:
   push:
     branches: [fix/prayer-sync-no-play-redirect]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
