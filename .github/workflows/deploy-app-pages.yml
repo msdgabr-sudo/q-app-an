@@ -2,6 +2,7 @@ name: Deploy app.qiblalabs.com
 
 # Active release: QiblaAstro 3.1.0 / Android versionCode 3.
 # This deployment must not publish the later code-4 native Location bridge assets.
+# Location onboarding must stay independent from Adhan notification permission.
 
 on:
   push:
@@ -50,8 +51,11 @@ jobs:
           assert cfg["appVersion"] == "3.1.0", cfg["appVersion"]
           assert cfg["appVersionCode"] == 3, cfg["appVersionCode"]
           PY
-          grep -Fq "VERSION='qiblaastro-v6.16-azkar-direct-native'" source/service-worker.js
-          grep -Fq "permissions-onboarding.js?v=20260818-location-adhan2" source/js/presentation/bootstrap.js
+          grep -Fq "VERSION='qiblaastro-3.1.0-code3-location-only-r1'" source/service-worker.js
+          grep -Fq "PERMISSIONS_RELEASE='code3-location-only-20260819-r1'" source/service-worker.js
+          grep -Fq "permissions-onboarding.js?v=20260819-code3-location-only1" source/js/presentation/bootstrap.js
+          grep -Fq "qiblaastro:permissions-onboarding:v3-location-only" source/js/presentation/permissions-onboarding.js
+          ! grep -Fq "prepareAdhanStage" source/js/presentation/permissions-onboarding.js
           test ! -e source/js/presentation/location-service-control.js
           ! grep -RIlE --exclude-dir='.git' 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|service_account|private_key_id' source >/dev/null
           if find source -type f \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.pem' \) -print -quit | grep -q .; then
