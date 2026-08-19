@@ -63,6 +63,8 @@ jobs:
           node tests/local-timezone-adapter.test.js
           node tests/timezone-production-wiring.test.js
           node tests/trusted-location-runtime-sync.test.js
+          node tests/location-service-cycle.test.js
+          node tests/service-worker-location-refresh.test.js
           node tests/i18n-roundtrip-safety.test.js
           node tests/a2-phone-ui-regressions.test.js
           node tests/permissions-gnss-adhan-cycle.test.js
