@@ -13,11 +13,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 EXPECTED_PACKAGE = "com.qiblalabs"
 EXPECTED_APP_NAME = "QiblaAstro ELITE"
 EXPECTED_WEB_MANIFEST_NAME = "QiblaAstro ELITE — بوصلة القبلة الفلكية"
-EXPECTED_VERSION_NAME = "3.1.1"
-EXPECTED_VERSION_CODE = "4"
+EXPECTED_VERSION_NAME = "3.1.2"
+EXPECTED_VERSION_CODE = "5"
 EXPECTED_GA4 = "G-1D1GKVZB74"
 EXPECTED_DOMAIN = "app.qiblalabs.com"
-EXPECTED_SW_VERSION = "qiblaastro-v6.20-azkar-native-confirmed"
+EXPECTED_SW_VERSION = "qiblaastro-v6.21-code5-native-bridge-location"
 
 errors: list[str] = []
 notes: list[str] = []
@@ -85,11 +85,14 @@ if "./js/presentation/quran/back-history.js" not in service_worker: fail("servic
 if "./js/presentation/azkar/back-history.js" not in service_worker: fail("service worker does not precache the modern Azkar nested Back bridge")
 if "./js/presentation/prayer/native-plan.js" not in service_worker: fail("service worker does not precache the native prayer date-plan bridge")
 if "./js/azkar-native-reminders.js" not in service_worker: fail("service worker does not precache the confirmed native Azkar bridge")
+if "./js/presentation/native-bridge-recovery.js" not in service_worker: fail("service worker does not precache the code5 native bridge recovery module")
+if "./js/presentation/location-service-control.js" not in service_worker: fail("service worker does not precache the Android Location service-control module")
 if "azkar-native-confirmed-20260818-v1" not in service_worker: fail("service worker does not expose the confirmed native Azkar release marker")
+if "native-location-permission-code5-20260819-v1" not in service_worker: fail("service worker does not expose the code5 Location permission release marker")
 if EXPECTED_SW_VERSION not in service_worker: fail(f"service worker version must be {EXPECTED_SW_VERSION}")
 notes.append("GA4 screen analytics is non-essential and limited to stable screen names, surface type, views and active-screen duration")
 notes.append("Application functionality must remain independent of analytics/cookie consent")
-notes.append("This web/TWA tracker adds no Firebase SDK, AD_ID permission or new Android runtime permission dialog")
+notes.append("This web/TWA tracker adds no Firebase SDK, AD_ID permission or new Android runtime permission dialog outside the explicit code5 Location flow")
 scan_ext={".html",".js",".json",".xml",".gradle",".kts"}; ad_markers=["com.google.android.gms.ads","google_mobile_ads_app_id","ca-app-pub-","android.permission.ad_id","android.permission.AD_ID"]
 for path in ROOT.rglob("*"):
     if not path.is_file() or path.suffix.lower() not in scan_ext: continue
@@ -98,7 +101,7 @@ for path in ROOT.rglob("*"):
     except OSError: continue
     low=text.lower()
     for marker in ad_markers:
-        if marker.lower() in low: fail(f"first-release ad-free gate: found {marker!r} in {path.relative_to(ROOT)}")
+        if marker.lower() in low: fail(f"ad-free gate: found {marker!r} in {path.relative_to(ROOT)}")
 assetlinks=ROOT/".well-known"/"assetlinks.json"
 if assetlinks.exists():
     text=assetlinks.read_text(encoding="utf-8",errors="replace")
@@ -111,4 +114,4 @@ for note in notes: print(f"NOTE: {note}")
 if errors:
     for error in errors: print(f"ERROR: {error}",file=sys.stderr)
     print(f"FAILED: {len(errors)} issue(s)",file=sys.stderr); raise SystemExit(1)
-print("PASS: repository-side pre-APK checks succeeded")
+print("PASS: repository-side pre-APK checks succeeded for 3.1.2 code5")
