@@ -2,7 +2,7 @@
  * © 2026 Mohamed SG Behairy. All Rights Reserved. */
 'use strict';
 const VERSION='qiblaastro-v6.20-azkar-native-confirmed';
-const BRIDGE_RELEASE='native-bridge-recovery-20260819-v1';
+const BRIDGE_RELEASE='prayer-exact-20260818-v1';
 const AZKAR_RELEASE='azkar-native-confirmed-20260818-v1';
 const GNSS_RELEASE='trusted-startup-recovery-20260818';
 const PERMISSIONS_RELEASE='location-adhan-exact-cycle-20260818-v1';
