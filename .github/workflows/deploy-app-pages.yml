@@ -1,5 +1,8 @@
 name: Deploy app.qiblalabs.com
 
+# Active release: QiblaAstro 3.1.0 / Android versionCode 3.
+# This deployment must not publish the later code-4 native Location bridge assets.
+
 on:
   push:
     branches:
@@ -40,6 +43,16 @@ jobs:
           test -f source/.well-known/assetlinks.json
           test "$(tr -d '\r\n' < source/CNAME)" = "app.qiblalabs.com"
           test "$(tr -d '\r\n' < source/.release-source-sha)" = "6e49775df5742413371a4165ea985173c43f5f5e"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          cfg = json.loads(Path("source/android-twa/twa-manifest.json").read_text(encoding="utf-8"))
+          assert cfg["appVersion"] == "3.1.0", cfg["appVersion"]
+          assert cfg["appVersionCode"] == 3, cfg["appVersionCode"]
+          PY
+          grep -Fq "VERSION='qiblaastro-v6.16-azkar-direct-native'" source/service-worker.js
+          grep -Fq "permissions-onboarding.js?v=20260818-location-adhan2" source/js/presentation/bootstrap.js
+          test ! -e source/js/presentation/location-service-control.js
           ! grep -RIlE --exclude-dir='.git' 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|service_account|private_key_id' source >/dev/null
           if find source -type f \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.pem' \) -print -quit | grep -q .; then
             echo 'ERROR: signing/private key material found in web release.' >&2
