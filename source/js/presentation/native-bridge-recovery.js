@@ -5,6 +5,8 @@
 (function(root){
 'use strict';
 var TOKEN_KEY='qiblaastro:native-token';
+var BRIDGE_KEY='qiblaastro:native-bridge-version';
+var REQUIRED_BRIDGE='5';
 var installed=false;
 var observer=null;
 
@@ -14,6 +16,14 @@ function isTwa(){
     return q.get('twa')==='1'||root.sessionStorage.getItem('qiblaastro:twa')==='1';
   }catch(_){return false;}
 }
+function bridgeVersion(){
+  try{
+    var q=new URLSearchParams(root.location.search||''),incoming=q.get('nativeBridge');
+    if(incoming){root.sessionStorage.setItem(BRIDGE_KEY,incoming);return incoming;}
+    return root.sessionStorage.getItem(BRIDGE_KEY)||'';
+  }catch(_){return '';}
+}
+function isCode5(){return bridgeVersion()===REQUIRED_BRIDGE;}
 function captureToken(){
   try{
     var raw=String(root.location&&root.location.hash||'').replace(/^#/,'');
@@ -37,12 +47,15 @@ function launch(uri){
   try{(root.top||root).location.href=uri;return true;}catch(_){try{root.location.href=uri;return true;}catch(__){return false;}}
 }
 function bootstrap(){
+  if(!isCode5())return false;
   var b=primary();
   if(b){b.disabled=false;b.dataset.stage='native-bootstrap';b.textContent='إعادة ربط Android';}
   locationState('بانتظار Android');
   note('سيعيد Android فتح QiblaAstro بقناة الربط الآمنة، ثم نكمل صلاحية الموقع.');
+  return true;
 }
 function permissionBridge(){
+  if(!isCode5())return false;
   var t=token(),b=primary();
   if(!t){bootstrap();return false;}
   if(b){b.disabled=true;b.dataset.stage='native-location-permission';b.textContent='فتح صلاحية الموقع في Android...';}
@@ -63,7 +76,7 @@ async function permissionStatus(){
   }catch(_){return 'unknown';}
 }
 function reconcile(){
-  if(!isTwa()||!root.document||!root.document.getElementById('qa-permission-overlay'))return;
+  if(!isTwa()||!isCode5()||!root.document||!root.document.getElementById('qa-permission-overlay'))return;
   if(!token()){bootstrap();return;}
   permissionStatus().then(function(state){
     if(state==='granted'){
@@ -82,7 +95,7 @@ function reconcile(){
 }
 function onClick(event){
   var b=event.target&&event.target.closest?event.target.closest('#qa-permission-allow'):null;
-  if(!b||!isTwa())return;
+  if(!b||!isTwa()||!isCode5())return;
   if(!token()||b.dataset.stage==='native-bootstrap'){
     event.preventDefault();event.stopPropagation();if(event.stopImmediatePropagation)event.stopImmediatePropagation();
     bootstrap();launch('qiblaastro://native-bootstrap');return;
@@ -94,12 +107,13 @@ function onClick(event){
 }
 function start(){
   if(installed||!root.document||!isTwa())return;installed=true;
+  bridgeVersion();captureToken();
   root.document.addEventListener('click',onClick,true);
   try{observer=new MutationObserver(reconcile);observer.observe(root.document.body||root.document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','data-stage']});}catch(_){ }
-  root.addEventListener('focus',function(){captureToken();root.setTimeout(reconcile,120);});
-  root.document.addEventListener('visibilitychange',function(){if(!root.document.hidden){captureToken();root.setTimeout(reconcile,120);}});
+  root.addEventListener('focus',function(){bridgeVersion();captureToken();root.setTimeout(reconcile,120);});
+  root.document.addEventListener('visibilitychange',function(){if(!root.document.hidden){bridgeVersion();captureToken();root.setTimeout(reconcile,120);}});
   root.setTimeout(reconcile,100);
 }
-root.QiblaNativeBridgeRecovery=Object.freeze({reconcile:reconcile,bootstrap:bootstrap,requestLocationPermission:permissionBridge,hasToken:function(){return !!token();}});
+root.QiblaNativeBridgeRecovery=Object.freeze({reconcile:reconcile,bootstrap:bootstrap,requestLocationPermission:permissionBridge,hasToken:function(){return !!token();},bridgeVersion:bridgeVersion,isCode5:isCode5});
 if(root.document){if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',start,{once:true});else start();}
 })(typeof globalThis!=='undefined'?globalThis:window);
