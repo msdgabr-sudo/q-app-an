@@ -1,9 +1,9 @@
-/* QiblaAstro 3.1.0/code 3 — independent location permission + existing native bridges
+/* QiblaAstro 3.1.0/code 3 — independent location permission + trusted GNSS handoff
  * © 2026 Mohamed SG Behairy. All Rights Reserved. */
 'use strict';
-const VERSION='qiblaastro-3.1.0-code3-location-only-r1';
+const VERSION='qiblaastro-3.1.0-code3-gnss-handoff-r2';
 const BRIDGE_RELEASE='prayer-direct-20260818';
-const GNSS_RELEASE='trusted-startup-recovery-20260818';
+const GNSS_RELEASE='trusted-position-handoff-20260819-r2';
 const PERMISSIONS_RELEASE='code3-location-only-20260819-r1';
 const CACHE_PREFIX='qiblaastro-';
 const APP_CACHE=VERSION+'-app';
