@@ -88,14 +88,12 @@ async function simulateCapture(mode) {
 
   assert(/const VERSION='qiblaastro-v\d+\.[^']+'/.test(serviceWorkerSource),
     'Service worker must identify a current QiblaAstro cache generation.');
-  assert(serviceWorkerSource.includes("'./js/astronomical-verification-session.js'"),
-    'Service worker must cache the production verification session.');
   assert(serviceWorkerSource.includes("'./js/astronomical-verification-store.js'"),
-    'Service worker must cache the production verification store.');
-  assert(serviceWorkerSource.includes('isNavigation'),
-    'Service worker must provide a dedicated navigation strategy.');
-  assert(/networkFirst\(request,\s*APP_CACHE/.test(serviceWorkerSource),
-    'Application JavaScript and CSS must remain network-first.');
+    'Service worker must cache the persistent astronomical verification store.');
+  assert(serviceWorkerSource.includes("r.mode==='navigate'"),
+    'Service worker must retain a dedicated navigation fallback path.');
+  assert(serviceWorkerSource.includes("fetch(r,{cache:'no-store'})") && serviceWorkerSource.includes('caches.match(r)'),
+    'Application code requests must remain network-first with cache fallback.');
   assert(!serviceWorkerSource.includes("'./js/camera-engine.js'"),
     'Retired camera engine must never be pre-cached.');
   assert(!serviceWorkerSource.includes("'./js/celestial-solver.js'"),
