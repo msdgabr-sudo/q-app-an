@@ -27,6 +27,7 @@ jobs:
         working-directory: source
         run: |
           set -euo pipefail
+          python3 tools/pre_apk_check.py
           node --check js/presentation/native-bridge-recovery.js
           node --check js/presentation/bootstrap.js
           node tests/native-bridge-location-code5.test.js
