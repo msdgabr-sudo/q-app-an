@@ -46,6 +46,9 @@ if(-not $text.Contains($marker)){$components=@"
         <activity android:name="com.qiblalabs.nativebridge.LocationSettingsActivity" android:exported="true" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="qiblaastro" android:host="location-settings" /></intent-filter>
         </activity>
+        <activity-alias android:name="com.qiblalabs.nativebridge.NativeBridgeBootstrapAlias" android:targetActivity="com.qiblalabs.nativebridge.QiblaLauncherActivity" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="qiblaastro" android:host="native-bootstrap" /></intent-filter>
+        </activity-alias>
         <receiver android:name="com.qiblalabs.nativebridge.PrayerNotificationReceiver" android:exported="false" />
         <receiver android:name="com.qiblalabs.nativebridge.PrayerBootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.intent.action.TIMEZONE_CHANGED" /><action android:name="android.intent.action.TIME_SET" /><action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" /></intent-filter></receiver>
         <receiver android:name="com.qiblalabs.widget.QiblaWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/qibla_widget_info" /></receiver>
@@ -72,6 +75,7 @@ $text=Get-Content -LiteralPath $Manifest -Raw
 
 if($text -match 'android:name=["''](?:com\.qiblalabs\.)?WidgetDataActivity["'']'){throw 'Legacy exported WidgetDataActivity must not return.'}
 if($text -notmatch 'QiblaLauncherActivity'){throw 'Authenticated launcher replacement failed.'}
+if($text -notmatch 'NativeBridgeBootstrapAlias' -or $text -notmatch 'native-bootstrap'){throw 'Native bridge recovery alias injection failed.'}
 if($text -notmatch 'LocationSettingsActivity'){throw 'Authenticated Location settings activity injection failed.'}
 if($text -notmatch 'android.permission.SCHEDULE_EXACT_ALARM'){throw 'Exact prayer alarm permission injection failed.'}
 $sync=Get-Content -LiteralPath (Join-Path $JavaBridge 'PrayerWidgetSyncActivity.java') -Raw
@@ -88,4 +92,4 @@ if($location -notmatch 'NativeBridgeToken\.valid' -or $location -notmatch 'ACTIO
 if($locationState -notmatch 'isLocationEnabled' -or $locationState -notmatch 'GPS_PROVIDER'){throw 'Android Location service-state reader missing.'}
 $widgetProvider=Get-Content -LiteralPath (Join-Path $JavaWidget 'QiblaWidgetProvider.java') -Raw
 if($widgetProvider -notmatch 'onAppWidgetOptionsChanged' -or $widgetProvider -notmatch 'qibla_widget_compact' -or $widgetProvider -notmatch 'qibla_widget_large'){throw 'Responsive premium widget provider integration missing.'}
-Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + Location settings + responsive translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
+Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + Location settings + native bridge recovery + responsive translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
