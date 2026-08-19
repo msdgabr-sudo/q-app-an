@@ -10,7 +10,6 @@ var ADHAN_LAUNCH_KEY='qiblaastro:prayer-native-launch-adhan:v1';
 var AZKAR_KEY='qiblaastro:native-azkar-state:v2';
 var TWA_KEY='qiblaastro:twa';
 var MIN_TOKEN_LENGTH=32;
-var NATIVE_FIELDS=['nativeToken','nativeLocation','nativeAdhan','nativeAzkar','azkarInterval','azkarPhrase','azkarResult','azkarIssue'];
 
 function eachWindow(fn){
   var seen=[];
@@ -56,11 +55,9 @@ function persistTrustedState(params,token){
     putSession(AZKAR_KEY,JSON.stringify(state));
   }
 }
-function cleanOwnNativeFragment(params){
-  if(!params)return;
-  var changed=false;
-  NATIVE_FIELDS.forEach(function(name){if(params.has(name)){params.delete(name);changed=true;}});
-  if(!changed)return;
+function cleanOwnToken(params){
+  if(!params||!params.has('nativeToken'))return;
+  params.delete('nativeToken');
   try{
     var clean=params.toString();
     root.history.replaceState(root.history.state||null,'',root.location.pathname+root.location.search+(clean?'#'+clean:''));
@@ -68,7 +65,12 @@ function cleanOwnNativeFragment(params){
 }
 function capture(){
   var own=nativeParams(root),token=validIncomingToken(own);
-  if(token){persistTrustedState(own,token);cleanOwnNativeFragment(own);return token;}
+  if(token){
+    // Persist the authenticated launch state immediately. Remove only the secret;
+    // leave non-secret native state fields for the existing Location/Adhan/Azkar
+    // owners to consume in their established order.
+    persistTrustedState(own,token);cleanOwnToken(own);return token;
+  }
 
   // Same-origin parent/top fallback is required by the isolated Azkar screen.
   eachWindow(function(win){
