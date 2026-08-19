@@ -73,9 +73,15 @@ function fingerprint(payload){try{var loc=payload.loc,st=payload.st,t=payload.ti
 function lastSync(){try{return root.sessionStorage.getItem(LAST_SYNC_KEY)||'';}catch(_){return '';}}
 function markSync(key){try{root.sessionStorage.setItem(LAST_SYNC_KEY,key);}catch(_){ }}
 function directUri(q){return 'qiblaastro://prayer-sync?'+q.toString();}
-function fallbackIntent(q){return 'intent://prayer-sync?'+q.toString()+'#Intent;scheme=qiblaastro;package=com.qiblalabs;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';}
 function buildQuery(payload,interactive,onboarding){var token=payload.token,loc=payload.loc,st=payload.st,q=new URLSearchParams();q.set('token',token);q.set('notify',st.enabled?'1':'0');q.set('interactive',interactive?'1':'0');q.set('onboarding',onboarding?'1':'0');q.set('city',loc.label||'');q.set('tz',payload.plan.timeZone||loc.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'');q.set('plan',payload.planText);var h=root.document&&root.document.getElementById('pr-h');q.set('hijri',h&&h.textContent?h.textContent:'');try{if(Number.isFinite(Number(QT)))q.set('qibla',Number(QT).toFixed(1));}catch(_){}q.set('advance',String(st.advance||0));q.set('profile',st.profile||'makkah');Object.keys(payload.map).forEach(function(id){q.set('t_'+id,String(payload.times[id]));q.set('m_'+id,(st.prayers&&st.prayers[payload.map[id]])||'off');});return q;}
-function launchBridge(q,reason){var launched=false;if(reason==='explicit'){var uri=directUri(q);try{var topWin=root.top||root;topWin.location.href=uri;launched=true;}catch(_){try{root.location.href=uri;launched=true;}catch(__){launched=false;}}if(launched)return true;}var fallback=fallbackIntent(q);try{(root.top||root).location.href=fallback;return true;}catch(_){try{root.location.href=fallback;return true;}catch(__){return false;}}}
+function openDirectBridge(q){
+  // Never use an intent:// URI containing package=com.qiblalabs here. Chrome may
+  // route an unresolved package-scoped intent to Google Play. The custom scheme
+  // already maps directly to the exported PrayerWidgetSyncActivity in our APK.
+  var uri=directUri(q),target=root.top||root;
+  try{target.location.href=uri;return true;}catch(_){try{root.location.href=uri;return true;}catch(__){return false;}}
+}
+function launchBridge(q,reason){return openDirectBridge(q);}
 function launchOnboardingBridge(q){
   return new Promise(function(resolve){
     var done=false,timerId=null,departed=false;
@@ -86,9 +92,7 @@ function launchOnboardingBridge(q){
     function onVisibility(){try{if(root.document&&root.document.hidden)onDepart();else onReturn();}catch(_){} }
     try{root.addEventListener('blur',onDepart,true);root.addEventListener('pagehide',onDepart,true);root.addEventListener('focus',onReturn,true);if(root.document)root.document.addEventListener('visibilitychange',onVisibility,true);}catch(_){}
     timerId=root.setTimeout(function(){finish(false);},HANDOFF_TIMEOUT_MS);
-    var target=root.top||root,uri=fallbackIntent(q),launched=false;
-    try{target.location.href=uri;launched=true;}catch(_){try{root.location.href=uri;launched=true;}catch(__){launched=false;}}
-    if(!launched)finish(false);
+    if(!openDirectBridge(q))finish(false);
   });
 }
 function nativeSync(reason){var payload=nativePayload();if(!payload)return false;var fp=fingerprint(payload);if(!fp)return false;if(reason!=='explicit'&&lastSync()===fp)return true;var q=buildQuery(payload,reason==='explicit',false),launched=launchBridge(q,reason);if(launched){markSync(fp);if(reason==='explicit')setAutoEnabled();}return launched;}
