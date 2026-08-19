@@ -75,9 +75,9 @@ function markSync(key){try{root.sessionStorage.setItem(LAST_SYNC_KEY,key);}catch
 function directUri(q){return 'qiblaastro://prayer-sync?'+q.toString();}
 function buildQuery(payload,interactive,onboarding){var token=payload.token,loc=payload.loc,st=payload.st,q=new URLSearchParams();q.set('token',token);q.set('notify',st.enabled?'1':'0');q.set('interactive',interactive?'1':'0');q.set('onboarding',onboarding?'1':'0');q.set('city',loc.label||'');q.set('tz',payload.plan.timeZone||loc.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'');q.set('plan',payload.planText);var h=root.document&&root.document.getElementById('pr-h');q.set('hijri',h&&h.textContent?h.textContent:'');try{if(Number.isFinite(Number(QT)))q.set('qibla',Number(QT).toFixed(1));}catch(_){}q.set('advance',String(st.advance||0));q.set('profile',st.profile||'makkah');Object.keys(payload.map).forEach(function(id){q.set('t_'+id,String(payload.times[id]));q.set('m_'+id,(st.prayers&&st.prayers[payload.map[id]])||'off');});return q;}
 function openDirectBridge(q){
-  // Never use an intent:// URI containing package=com.qiblalabs here. Chrome may
-  // route an unresolved package-scoped intent to Google Play. The custom scheme
-  // already maps directly to the exported PrayerWidgetSyncActivity in our APK.
+  // Do not use a package-scoped intent URI here. Chrome may route an unresolved
+  // package handoff to Google Play. The custom scheme already maps directly to
+  // the exported PrayerWidgetSyncActivity in our APK.
   var uri=directUri(q),target=root.top||root;
   try{target.location.href=uri;return true;}catch(_){try{root.location.href=uri;return true;}catch(__){return false;}}
 }
