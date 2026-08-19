@@ -1,0 +1,102 @@
+name: Verify code5 native bridge and Location recovery
+
+on:
+  push:
+    branches: [fix/code5-native-bridge-location]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BUBBLEWRAP_IMAGE: ghcr.io/googlechromelabs/bubblewrap@sha256:01b3d5cdcdb670edd8ee00654c36f978896da78dfd7cc7e62814b83268c6f53b
+
+jobs:
+  verify-code5:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Verify code5 bridge contract and protected boundaries
+        working-directory: source
+        run: |
+          set -euo pipefail
+          node --check js/presentation/native-bridge-recovery.js
+          node --check js/presentation/bootstrap.js
+          node tests/native-bridge-location-code5.test.js
+          python3 android-twa/check_twa_config.py
+          node tests/trusted-location-runtime-sync.test.js
+          node tests/wmm2025-runtime-integration.test.js
+          node tests/prayer-global-runtime-integration.test.js
+          node tests/astronomical-verification-store-persistence.test.js
+          node tests/widget-premium-responsive.test.js
+          node tests/native-android-localization-security.test.js
+
+      - name: Pull pinned Bubblewrap toolchain
+        run: docker pull "$BUBBLEWRAP_IMAGE"
+
+      - name: Generate Android code5 project
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/source/android-twa:/app" -w /app "$BUBBLEWRAP_IMAGE" update --manifest twa-manifest.json --skipVersionUpgrade
+          sudo chown -R "$(id -u):$(id -g)" source/android-twa
+          test -x source/android-twa/gradlew
+          test -f source/android-twa/app/src/main/AndroidManifest.xml
+
+      - name: Inject approved native code and validate generated manifest
+        run: |
+          set -euo pipefail
+          python3 source/android-twa/ensure_target_api_36.py
+          pwsh -NoProfile -File source/android-twa/apply_native_azkar_reminders.ps1
+          pwsh -NoProfile -File source/android-twa/apply_native_widget.ps1
+          grep -q 'QiblaLauncherActivity' source/android-twa/app/src/main/AndroidManifest.xml
+          grep -q 'native-bootstrap' source/android-twa/app/src/main/AndroidManifest.xml
+          grep -q 'LocationPermissionActivity' source/android-twa/app/src/main/AndroidManifest.xml
+          grep -q 'location-permission' source/android-twa/app/src/main/AndroidManifest.xml
+          ! grep -q 'ACCESS_BACKGROUND_LOCATION' source/android-twa/app/src/main/AndroidManifest.xml
+
+      - name: Build unsigned code5 AAB
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint bash -v "$PWD/source/android-twa:/app" -w /app "$BUBBLEWRAP_IMAGE" -lc '
+            set -euo pipefail
+            CFG=/root/.bubblewrap/config.json
+            export JAVA_HOME=$(node -p "require(\"$CFG\").jdkPath")
+            export ANDROID_HOME=$(node -p "require(\"$CFG\").androidSdkPath")
+            export ANDROID_SDK_ROOT="$ANDROID_HOME"
+            SDKMANAGER=$(find "$ANDROID_HOME" -type f -name sdkmanager -perm -111 | head -1)
+            export PATH="$JAVA_HOME/bin:$(dirname "$SDKMANAGER"):$ANDROID_HOME/platform-tools:$PATH"
+            yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
+            "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platforms;android-36" "build-tools;35.0.0"
+            ./gradlew --no-daemon :app:processReleaseMainManifest
+            python3 check_generated_permissions.py
+            bubblewrap build --skipSigning --skipPwaValidation --manifest=twa-manifest.json
+          '
+          sudo chown -R "$(id -u):$(id -g)" source/android-twa
+          CANDIDATE=''
+          for f in source/android-twa/app/build/outputs/bundle/release/app-release.aab source/android-twa/app-release-bundle.aab; do
+            if [ -s "$f" ]; then CANDIDATE="$f"; break; fi
+          done
+          test -n "$CANDIDATE"
+          mkdir -p dist
+          cp "$CANDIDATE" dist/QiblaAstro-3.1.2-code5-unsigned.aab
+          unzip -t dist/QiblaAstro-3.1.2-code5-unsigned.aab >/dev/null
+          unzip -p dist/QiblaAstro-3.1.2-code5-unsigned.aab base/dex/classes.dex | strings | grep -q 'QiblaLauncherActivity'
+          unzip -p dist/QiblaAstro-3.1.2-code5-unsigned.aab base/dex/classes.dex | strings | grep -q 'LocationPermissionActivity'
+          unzip -p dist/QiblaAstro-3.1.2-code5-unsigned.aab base/manifest/AndroidManifest.xml | strings | grep -q 'native-bootstrap'
+          unzip -p dist/QiblaAstro-3.1.2-code5-unsigned.aab base/manifest/AndroidManifest.xml | strings | grep -q 'location-permission'
+          sha256sum dist/QiblaAstro-3.1.2-code5-unsigned.aab | tee dist/QiblaAstro-3.1.2-code5-unsigned.aab.sha256
+
+      - name: Upload code5 proof
+        uses: actions/upload-artifact@v6
+        with:
+          name: QiblaAstro-3.1.2-code5-native-bridge-location-proof
+          path: |
+            dist/QiblaAstro-3.1.2-code5-unsigned.aab
+            dist/QiblaAstro-3.1.2-code5-unsigned.aab.sha256
+          if-no-files-found: error
+          retention-days: 14
