@@ -56,6 +56,7 @@ const mergedGate=read('android-twa/check_generated_permissions.py');
 // Per-install authenticated bridge.
 for(const t of ['SecureRandom','MODE_PRIVATE','candidate'])assert(token.includes(t),`token gate missing ${t}`);
 assert(launcher.includes('nativeToken=')&&!launcher.includes('appendQueryParameter("nativeToken"'),'native token must remain fragment-only');
+assert(launcher.includes('appendQueryParameter("nativeBridge", NATIVE_BRIDGE_VERSION)'),'code5 capability marker must be non-secret and query-visible');
 assert(launcher.includes('nativeAdhan=')&&launcher.includes('PrayerNativeScheduler.nativeActive(this)'),'launcher must report confirmed native scheduler ownership');
 assert(launcher.includes('nativeAzkar=')&&launcher.includes('azkarInterval=')&&launcher.includes('azkarPhrase='),'launcher must report confirmed Native Azkar state');
 assert(launcher.includes('azkarResult=')&&launcher.includes('azkarIssue='),'launcher must report Native Azkar result/issue to the TWA');
@@ -92,7 +93,7 @@ assert(receiver.includes('extends BroadcastReceiver'));
 assert(receiver.includes('show(context,id,mode,pre);')&&receiver.includes('PrayerNativeScheduler.reschedule(context);'));
 assert(receiver.includes('USAGE_ALARM')&&receiver.includes('rawNameForAdhan'));
 assert(receiver.includes('"/raw/"+rawName'),'prayer notification sound URI must use stable raw resource name rather than numeric resource id');
-assert(receiver.includes('_v2'),'code4 must use a fresh prayer notification channel contract after the native upgrade');
+assert(receiver.includes('_v2'),'code5 preserves the fresh prayer notification channel contract after the native upgrade');
 assert(prayerBoot.includes('ACTION_BOOT_COMPLETED')&&prayerBoot.includes('ACTION_MY_PACKAGE_REPLACED')&&prayerBoot.includes('ACTION_TIMEZONE_CHANGED')&&prayerBoot.includes('ACTION_TIME_CHANGED'));
 assert(prayerBoot.includes('ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED'),'granting exact access must restore schedule');
 for(const raw of ['adhan_mecca.mp3','adhan_ahmed_al_nufais.mp3','adhan_islam_sobhi.mp3','adhan_fajr.mp3'])assert(apply.includes(raw),`native Adhan package missing ${raw}`);
@@ -154,9 +155,11 @@ assert(azPage.includes('azkar-native-reminders.js?v=20260818-native5'),'Azkar pa
 const bootstrap=read('js/presentation/bootstrap.js');
 assert(bootstrap.includes('loadPrayerCore(loadPermissions);'));
 assert(bootstrap.includes('native-plan.js?v=20260818-adhan-core2')&&bootstrap.includes('schedule-sync.js?v=20260818-adhan-core2'));
+assert(bootstrap.includes('native-bridge-recovery.js?v=20260819-code5-bridge1'));
 const sw=read('service-worker.js');
-assert(sw.includes("qiblaastro-v6.20-azkar-native-confirmed"));
+assert(sw.includes("qiblaastro-v6.21-code5-native-bridge-location"));
 assert(sw.includes("AZKAR_RELEASE='azkar-native-confirmed-20260818-v1'"));
+assert(sw.includes('./js/presentation/native-bridge-recovery.js')&&sw.includes('./js/presentation/location-service-control.js'));
 assert(sw.includes('./js/presentation/prayer/native-plan.js')&&sw.includes('./js/presentation/prayer/schedule-sync.js')&&sw.includes('./js/azkar-native-reminders.js'));
 
 console.log('Native Android localization/security gate: PASS');
