@@ -1,0 +1,41 @@
+name: Verify prayer sync no-Play fix
+
+on:
+  push:
+    branches: [fix/prayer-sync-no-play-redirect]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Syntax check prayer sync bridge
+        working-directory: source
+        run: node --check js/presentation/prayer/schedule-sync.js
+      - name: Run permissions GNSS Adhan regression gate
+        working-directory: source
+        run: node tests/permissions-gnss-adhan-cycle.test.js
+      - name: Prove no Google Play fallback exists in web/native handoff
+        working-directory: source
+        run: |
+          set -euo pipefail
+          ! grep -R "intent://prayer-sync" js/presentation/prayer/schedule-sync.js
+          ! grep -R "package=com.qiblalabs" js/presentation/prayer/schedule-sync.js
+          ! grep -E "play\\.google\\.com|market://" js/presentation/prayer/schedule-sync.js
+          grep -F "qiblaastro://prayer-sync?" js/presentation/prayer/schedule-sync.js
+          grep -F 'android:scheme="qiblaastro" android:host="prayer-sync"' android-twa/apply_native_widget.ps1
+      - name: Verify protected runtime boundaries unchanged
+        working-directory: source
+        run: |
+          set -euo pipefail
+          node tests/wmm2025-runtime-integration.test.js
+          node tests/prayer-global-runtime-integration.test.js
+          node tests/astronomical-verification-store-persistence.test.js
