@@ -26,7 +26,6 @@ assert(nativeActivity.includes('PrayerNativeScheduler.reschedule(this)'),'Native
 assert(permissions.includes("qiblaastro:permissions-onboarding:v3-location-only"),'Location-only state must not reuse the stale coupled v2 onboarding state');
 assert(permissions.includes('getLocationPermissionStatus'),'Permission flow must observe the browser/TWA geolocation permission state');
 assert(permissions.includes('root.navigator.geolocation.getCurrentPosition('),'The explicit location button must call geolocation so Android/TWA can show its native dialog');
-assert(permissions.includes('root.acceptTrustedGnssPosition(pos)'),'The successful permission position must be handed to the trusted GNSS runtime instead of discarded');
 assert(permissions.includes('function requestLocation(){')&&!permissions.includes('async function requestLocation()'),'The native geolocation request must not await the Permissions API observer');
 assert(!permissions.includes("if(status&&status.state==='granted')return 'granted'"),'Permissions API state must not bypass the actual geolocation request');
 assert(!permissions.includes("if(status&&status.state==='denied')return 'denied'"),'Permissions API state must not replace the actual geolocation request');
@@ -71,10 +70,9 @@ assert(nativeScheduler.includes('PendingIntent.getBroadcast')&&nativeScheduler.i
 assert(nativeReceiver.includes('USAGE_ALARM')&&nativeReceiver.includes('rawForAdhan'),'Native receiver must retain local Adhan alarm audio');
 
 // Service worker and loader must force this exact integration to replace stale first-run code.
-assert(bootstrap.includes('permissions-onboarding.js?v=20260819-code3-gnss-handoff1'),'Bootstrap must request the fresh GNSS handoff permission asset');
+assert(bootstrap.includes('permissions-onboarding.js?v=20260819-code3-location-only1'),'Bootstrap must request the fresh location-only permission asset');
 assert(sw.includes("'./js/presentation/permissions-onboarding.js'"),'Permissions integration must stay in critical cache');
-assert(sw.includes("VERSION='qiblaastro-3.1.0-code3-gnss-handoff-r1'"),'Service worker must evict the stale pre-handoff cache');
-assert(sw.includes("GNSS_RELEASE='trusted-position-handoff-20260819-r1'"),'Service worker must advertise the trusted-position handoff release');
+assert(sw.includes("VERSION='qiblaastro-3.1.0-code3-location-only-r1'"),'Service worker must evict the stale coupled cache');
 assert(sw.includes("PERMISSIONS_RELEASE='code3-location-only-20260819-r1'"),'Service worker must advertise the location-only permissions release');
 assert(!sw.includes("'./js/05-gnss.js'"),'Service worker must not activate the unused external GNSS implementation beside the production inline engine');
 
