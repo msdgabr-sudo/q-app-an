@@ -4,7 +4,9 @@ name: Verify main release source and build unsigned AAB
 # --------------------------
 # `main` is the authoritative source for both the deployed web application and
 # Android release builds. Pull requests validate their candidate merge state;
-# pushes to main remain the authoritative release proof.
+# pushes to main remain the authoritative release proof. The protected scientific
+# core hash/regression gate is also executed here so release proof never depends
+# on a separate workflow being configured as a required check.
 
 on:
   push:
@@ -12,6 +14,7 @@ on:
     paths:
       - 'source/**'
       - '.github/workflows/verify-release-snapshot.yml'
+      - '.github/workflows/protected-core-integrity.yml'
       - 'RELEASE_SOURCE.md'
       - 'REPOSITORY_STATE.md'
   pull_request:
@@ -19,6 +22,7 @@ on:
     paths:
       - 'source/**'
       - '.github/workflows/verify-release-snapshot.yml'
+      - '.github/workflows/protected-core-integrity.yml'
       - 'RELEASE_SOURCE.md'
       - 'REPOSITORY_STATE.md'
   workflow_dispatch:
@@ -53,6 +57,24 @@ jobs:
             exit 1
           fi
           echo 'Baseline provenance marker verified. Current release candidate remains derived from main/source.'
+
+      - name: Verify protected scientific core integrity
+        working-directory: source
+        run: |
+          set -euo pipefail
+          node scripts/check-protected-core.js
+          node tests/astronomical-solver.integration.test.js
+          node tests/astronomical-verification-session.test.js
+          node tests/astronomical-observation-bridge.test.js
+          node tests/astronomical-qibla-semantic-mapping.test.js
+          node tests/compass-cards-canonical.test.js
+          node tests/qibla-card-runtime.test.js
+          node tests/record-display-e2e.test.js
+          node tests/retired-runtime-removal.test.js
+          node tests/tracking-lock-removal.test.js
+          node tests/astronomical-verification-store-persistence.test.js
+          node tests/astronomical/module-boundary.test.js
+          node tests/presentation/scientific-write-barrier.test.js
 
       - name: Run current release source gates
         working-directory: source

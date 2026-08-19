@@ -1,0 +1,78 @@
+name: Protected Scientific Core Integrity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'source/js/astro-verification.js'
+      - 'source/js/astronomical-observation-bridge.js'
+      - 'source/js/astronomical-solver.js'
+      - 'source/js/astronomical-verification-session.js'
+      - 'source/js/astronomical-verification-store.js'
+      - 'source/js/celestial-detector.js'
+      - 'source/js/camera-projection.js'
+      - 'source/js/camera-pose.js'
+      - 'source/js/gravity-reference.js'
+      - 'source/js/astro-qibla-engine.js'
+      - 'source/scripts/check-protected-core.js'
+      - 'source/tests/**'
+      - '.github/workflows/protected-core-integrity.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'source/js/astro-verification.js'
+      - 'source/js/astronomical-observation-bridge.js'
+      - 'source/js/astronomical-solver.js'
+      - 'source/js/astronomical-verification-session.js'
+      - 'source/js/astronomical-verification-store.js'
+      - 'source/js/celestial-detector.js'
+      - 'source/js/camera-projection.js'
+      - 'source/js/camera-pose.js'
+      - 'source/js/gravity-reference.js'
+      - 'source/js/astro-qibla-engine.js'
+      - 'source/scripts/check-protected-core.js'
+      - 'source/tests/**'
+      - '.github/workflows/protected-core-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protected-core:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: source
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Verify protected scientific-core blobs
+        run: node scripts/check-protected-core.js
+
+      - name: Run astronomical regression suite
+        run: |
+          set -euo pipefail
+          node tests/astronomical-solver.integration.test.js
+          node tests/astronomical-verification-session.test.js
+          node tests/astronomical-observation-bridge.test.js
+          node tests/astronomical-qibla-semantic-mapping.test.js
+          node tests/compass-cards-canonical.test.js
+          node tests/qibla-card-runtime.test.js
+          node tests/record-display-e2e.test.js
+          node tests/retired-runtime-removal.test.js
+          node tests/tracking-lock-removal.test.js
+          node tests/astronomical-verification-store-persistence.test.js
+
+      - name: Verify astronomical module boundary
+        run: node tests/astronomical/module-boundary.test.js
+
+      - name: Verify presentation cannot write scientific state
+        run: node tests/presentation/scientific-write-barrier.test.js

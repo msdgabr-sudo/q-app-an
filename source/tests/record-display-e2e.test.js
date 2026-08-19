@@ -89,6 +89,6 @@ const session=fs.readFileSync('js/astronomical-verification-session.js','utf8');
 assert(session.includes("alignmentMode: result.alignmentMode || 'astronomical-solved-bearing'"),'session must send canonical alignment mode');
 assert(!session.includes("alignmentMode: 'qibla-axis',"),'session must not hard-code rejected legacy mode');
 const sw=fs.readFileSync('service-worker.js','utf8');
-assert(/const VERSION='qiblaastro-v5\.[^']+'/.test(sw),'service worker must identify a current QiblaAstro cache generation');
+assert(/const VERSION='qiblaastro-v\d+\.[^']+'/.test(sw),'service worker must identify a current QiblaAstro cache generation');
 
 console.log('ASTRONOMICAL RECORD -> STORE -> COMPASS CARDS -> AUTHORITATIVE RUNTIME: PASS');

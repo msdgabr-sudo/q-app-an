@@ -1,23 +1,25 @@
-# QiblaAstro ELITE 3.1.0 — Release Source and Provenance
+# QiblaAstro ELITE 3.1.1 — Release Source and Provenance
 
-> Read `REPOSITORY_STATE.md` before release, branch, source-materialization, or recovery work.
+> Read `REPOSITORY_STATE.md` before release, branch, source-materialization, recovery, or platform-handoff work.
 
 ## Current source of truth
 
-The authoritative application and Android release source is now:
+The authoritative application and Android release source is:
 
 - Repository: `msdgabr-sudo/q-app-an`
 - Working/release branch: **`main`**
 - Source directory: `source/`
 - Package ID: `com.qiblalabs`
-- Version name: `3.1.0`
-- Version code: `3`
+- Version name: **`3.1.1`**
+- Version code: **`4`**
 - Minimum SDK: `23`
 - Compile SDK: `36`
 - Target SDK: `36`
 - TWA origin: `https://app.qiblalabs.com`
 
-The repository is being consolidated to one working branch. `release/aab-3.1.0` is historical and must receive no new product changes. It may be deleted only after the immutable consolidation tag described in `REPOSITORY_STATE.md` has been created remotely and verified.
+Other topic branches may exist, but they are not release sources. Only reviewed state merged into `main` is authoritative.
+
+Executable identity is verified by the TWA manifest, pre-APK gate and root release workflow. Historical Markdown or tags must never override those executable sources.
 
 ## Historical Mizan baseline provenance
 
@@ -29,26 +31,27 @@ The `source/` directory was originally materialized from:
 
 `source/.release-source-sha` retains that SHA as a **provenance marker**.
 
-This SHA is **not an instruction to replace current `main/source`**. Current main intentionally includes validated post-baseline fixes, including location-permission and Falaki runtime/presentation fixes. Re-materializing the historical Mizan baseline over `main/source` would discard valid current work and is forbidden unless the repository owner explicitly authorizes a recovery operation after a separate audit.
+This SHA is **not an instruction to replace current `main/source`**. Current `main` intentionally includes validated post-baseline fixes and release integrations. Re-materializing the historical Mizan baseline over `main/source` would discard valid current work and is forbidden unless the repository owner explicitly authorizes a recovery operation after a separate audit.
 
-The old materialization workflow is therefore retained only as a manual read-only provenance audit. It must not write to `source/` or push generated source commits.
+The old materialization workflow is retained only as a manual read-only provenance audit. It must not write to `source/` or push generated source commits.
 
-## Immutable consolidation reference
+## Historical 3.1.0 reference
 
-Required reference tag:
+`qiblaastro-3.1.0-single-branch-reference` is a fixed historical checkpoint from the earlier consolidation state. It is not the current release identity and must never be moved or reused for a later release.
 
-`qiblaastro-3.1.0-single-branch-reference`
+## Active release verification
 
-The tag is a fixed historical checkpoint for recovery/audit after consolidation. It is **not a development branch** and must never be moved, force-updated, rewritten, or reused for a later release. See `REPOSITORY_STATE.md` for the mandatory creation/deletion order.
+The authoritative root workflow is:
 
-## Acceptance evidence from historical handoff
+- `.github/workflows/verify-release-snapshot.yml`
 
-At historical Mizan baseline `6e49775df5742413371a4165ea985173c43f5f5e`, both the complete pre-native release gate and APK Release Candidate workflow completed successfully. The APK workflow verified generated Android identity, API level, required permissions, forbidden permissions, native Azkar reminders, authenticated prayer notifications, local Adhan integration, authenticated Widget integration and the native launcher bridge, then produced the APK RC artifact.
+It targets `main` and verifies the current 3.1.1/code4 release source, including protected scientific-core integrity, WMM2025, prayer methods/runtime, timezone wiring, trusted GNSS, i18n, phone UI regressions, permission/Adhan cycle, Android Location-service cycle, premium responsive widget, astronomical verification persistence, native Android localization/security and pre-native release readiness before building an unsigned AAB proof.
 
-APK RC workflow run: `31848703422`
-APK RC artifact digest: `sha256:f882e633388e6174a4419ece1c6ea96fa669df0cdd4ef3ca4b3a93a0fbc767e1`
+The active dedicated scientific-core workflow is:
 
-This historical evidence establishes the handoff baseline. Current `main` must additionally pass the current main release-verification workflow before any new Android package is treated as release-ready.
+- `.github/workflows/protected-core-integrity.yml`
+
+The obsolete nested workflow under `source/.github/workflows/` has been removed. The active workflow uses the current reviewed protected-core baseline from `source/scripts/check-protected-core.js` and runs the astronomical regression/module-boundary/write-barrier suite on `main`/pull requests.
 
 ## Verified signing identities
 
@@ -56,7 +59,7 @@ Play App Signing certificate SHA-256 supplied from Google Play Console:
 
 `2F:04:F6:F6:4D:09:E0:82:32:BC:5A:1F:DD:58:4B:19:8F:37:92:F6:18:18:98:AC:F0:0C:7F:AC:C0:BA:7D:B8`
 
-Local upload keystore SHA-256, independently checked with `keytool` and matched to the Google Play Upload key certificate:
+Local upload keystore SHA-256, independently checked with `keytool` and matched to the previously signed code3 bundle:
 
 `E8:6F:83:F1:61:0B:6F:AA:4F:57:62:4F:44:B1:B8:74:83:49:DB:84:69:EB:3C:CE:06:A4:BA:05:5B:CB:EC:A7`
 
@@ -76,14 +79,29 @@ Release packaging may not casually alter protected application behavior or scien
 - trusted GNSS security policy;
 - Quran/Azkar content unless explicitly scoped and reviewed.
 
-The release must include the approved native integrations, including localized Azkar reminders, authenticated prayer notifications and local Adhan audio, authenticated home Widget, and `QiblaLauncherActivity` with its guarded per-install token behavior.
+The release includes the approved native integrations, including localized Azkar reminders, authenticated prayer notifications and local Adhan audio, authenticated home Widget, and `QiblaLauncherActivity` with its guarded per-install token behavior.
 
-This ad-free release must not gain advertising-ID permission, and exact-alarm permission must not be introduced without a separately approved policy change.
+This ad-free release must not gain advertising-ID permission, and exact-alarm policy must remain limited to the approved user-granted `SCHEDULE_EXACT_ALARM` contract.
 
 ## Signing boundary
 
 The upload keystore and all signing passwords are external secrets. They must never be committed. Expected key file is `qiblaastro-upload.jks`, alias `qiblaastro`.
 
-The GitHub release gate builds an unsigned AAB proof from current `main/source`. Final signing is performed locally with the verified upload keystore using `build-final-signed-aab.ps1`; the wrapper temporarily places the key in the ignored source keystore directory and removes it when finished.
+The GitHub release gate builds an unsigned AAB proof from current `main/source`. Final signing is performed locally with the verified upload keystore. Google Play subsequently uses the configured Play App Signing identity for distributed packages.
 
-Before Play upload, verify the final signed AAB and generated hashes. Google Play will re-sign distributed APKs with the Play App Signing certificate above.
+## 3.1.1 / code4 completion record
+
+The Android **3.1.1 / versionCode 4** release operation has been completed for the existing Google Play **Closed testing** track.
+
+Verified release evidence:
+
+- package `com.qiblalabs`;
+- API 36 target;
+- unsigned AAB release-candidate proof passed the repository release gates;
+- signed locally with upload alias `qiblaastro`;
+- signed AAB certificate matches the established upload-key SHA-256 `E8:6F:83:F1:61:0B:6F:AA:4F:57:62:4F:44:B1:B8:74:83:49:DB:84:69:EB:3C:CE:06:A4:BA:05:5B:CB:EC:A7`;
+- signed AAB SHA-256 `1B0F16DEDE0FAB743A7F6827DBA3273838C040A32116DE66CD10458CF167CC12`;
+- local `jarsigner -verify` result: `jar verified.`;
+- Google Play publishing for the Closed testing Alpha track completed.
+
+This completion record does **not** claim a Production rollout. It records that the 3.1.1/code4 Android build, verification, signing and Closed-testing publication cycle is complete.
