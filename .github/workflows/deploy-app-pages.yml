@@ -1,7 +1,7 @@
 name: Deploy app.qiblalabs.com
 
 # Active release: QiblaAstro 3.1.0 / Android versionCode 3.
-# GNSS fix deployment: trusted first-position handoff, single-flight acquisition, and finite display gate.
+# Rollback deployment: restored the state before the GNSS display handoff.
 # This deployment must not publish the later code-4 native Location bridge assets.
 # Location onboarding must stay independent from Adhan notification permission.
 
@@ -52,14 +52,10 @@ jobs:
           assert cfg["appVersion"] == "3.1.0", cfg["appVersion"]
           assert cfg["appVersionCode"] == 3, cfg["appVersionCode"]
           PY
-          grep -Fq "VERSION='qiblaastro-3.1.0-code3-gnss-handoff-r2'" source/service-worker.js
-          grep -Fq "GNSS_RELEASE='trusted-position-handoff-20260819-r2'" source/service-worker.js
+          grep -Fq "VERSION='qiblaastro-3.1.0-code3-location-only-r1'" source/service-worker.js
           grep -Fq "PERMISSIONS_RELEASE='code3-location-only-20260819-r1'" source/service-worker.js
-          grep -Fq "permissions-onboarding.js?v=20260819-code3-gnss-handoff2" source/js/presentation/bootstrap.js
+          grep -Fq "permissions-onboarding.js?v=20260819-code3-location-only1" source/js/presentation/bootstrap.js
           grep -Fq "qiblaastro:permissions-onboarding:v3-location-only" source/js/presentation/permissions-onboarding.js
-          grep -Fq "root.acceptTrustedGnssPosition(pos)" source/js/presentation/permissions-onboarding.js
-          grep -Fq "function acceptTrustedGnssPosition(pos)" source/index.html
-          grep -Fq "var label='جاري تحديد الموقع'" source/index.html
           ! grep -Fq "prepareAdhanStage" source/js/presentation/permissions-onboarding.js
           test ! -e source/js/presentation/location-service-control.js
           ! grep -RIlE --exclude-dir='.git' 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|service_account|private_key_id' source >/dev/null

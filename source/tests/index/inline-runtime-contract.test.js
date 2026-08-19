@@ -14,10 +14,7 @@ while((m=re.exec(html))){
 if(scripts.length<1) throw new Error('No inline runtime found; contract cannot be verified.');
 function sha(s){return crypto.createHash('sha256').update(s).digest('hex');}
 
-// Updated only for the reviewed code-3 GNSS position handoff and finite-state
-// gate. Protected scientific equations are locked independently by the GNSS
-// regression test.
-const SENSITIVE='c23f268474315d5129276bde73b11498df6994e1bcda535edc13a75e9bbde65b';
+const SENSITIVE='7fb224ee49d39decc877f0785871a29d4c7306310de0045a2915c3f1e9de80f2';
 const sensitive=scripts.find(body=>sha(body)===SENSITIVE);
 if(!sensitive){
   throw new Error('Sensitive 185KB inline runtime changed or moved without contract migration. Expected SHA '+SENSITIVE);
