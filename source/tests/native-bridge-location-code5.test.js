@@ -16,6 +16,9 @@ const sw=read('service-worker.js');
 assert.strictEqual(manifest.appVersion,'3.1.2');
 assert.strictEqual(manifest.appVersionCode,5);
 assert(bootstrap.includes('native-bridge-recovery.js?v=20260819-code5-bridge1'));
+assert(recovery.includes("var REQUIRED_BRIDGE='5'"));
+assert(recovery.includes("q.get('nativeBridge')"));
+assert(recovery.includes('if(!b||!isTwa()||!isCode5())return;'),'code5-only custom routes must be gated from code4 clients');
 assert(recovery.includes("qiblaastro://native-bootstrap"));
 assert(recovery.includes("qiblaastro://location-permission?token="));
 assert(!/intent:\/\/native-bootstrap|play\.google\.com|market:\/\//i.test(recovery),'bridge recovery must never fall back to Google Play');
@@ -29,6 +32,7 @@ for(const forbidden of ['getLastLocation','getCurrentLocation','requestLocationU
   assert(!permission.includes(forbidden),`native permission bridge must not acquire/calculate: ${forbidden}`);
 }
 assert(launcher.includes('NativeBridgeToken.getOrCreate'));
+assert(launcher.includes('appendQueryParameter("nativeBridge", NATIVE_BRIDGE_VERSION)'));
 assert(launcher.includes('.fragment(fragment.toString())'));
 assert(sw.includes("qiblaastro-v6.21-code5-native-bridge-location"));
 assert(sw.includes("'./js/presentation/native-bridge-recovery.js'"));
