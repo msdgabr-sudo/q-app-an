@@ -1,0 +1,55 @@
+name: Android Location service cycle
+
+on:
+  push:
+    branches: [fix/trusted-gnss-location-cycle, main]
+    paths:
+      - 'source/js/presentation/location-service-control.js'
+      - 'source/js/presentation/bootstrap.js'
+      - 'source/android-twa/native/prayer-widget/NativeLocationState.java'
+      - 'source/android-twa/native/prayer-widget/LocationSettingsActivity.java'
+      - 'source/android-twa/native/prayer-widget/QiblaLauncherActivity.java'
+      - 'source/android-twa/apply_native_widget.ps1'
+      - 'source/android-twa/check_generated_permissions.py'
+      - 'source/tests/location-service-cycle.test.js'
+      - '.github/workflows/android-location-service-cycle.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'source/js/presentation/location-service-control.js'
+      - 'source/js/presentation/bootstrap.js'
+      - 'source/android-twa/native/prayer-widget/NativeLocationState.java'
+      - 'source/android-twa/native/prayer-widget/LocationSettingsActivity.java'
+      - 'source/android-twa/native/prayer-widget/QiblaLauncherActivity.java'
+      - 'source/android-twa/apply_native_widget.ps1'
+      - 'source/android-twa/check_generated_permissions.py'
+      - 'source/tests/location-service-cycle.test.js'
+      - '.github/workflows/android-location-service-cycle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  location-service-cycle:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: source
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Syntax check Location service control
+        run: node --check js/presentation/location-service-control.js
+      - name: Verify Android Location service recovery contract
+        run: node tests/location-service-cycle.test.js
+      - name: Verify existing Trusted GNSS regression contract
+        run: node tests/permissions-gnss-adhan-cycle.test.js
+      - name: Verify protected runtime boundaries
+        run: |
+          node tests/wmm2025-runtime-integration.test.js
+          node tests/prayer-global-runtime-integration.test.js
+          node tests/astronomical-verification-store-persistence.test.js
