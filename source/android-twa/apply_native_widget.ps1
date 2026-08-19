@@ -46,6 +46,9 @@ if(-not $text.Contains($marker)){$components=@"
         <activity android:name="com.qiblalabs.nativebridge.LocationSettingsActivity" android:exported="true" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="qiblaastro" android:host="location-settings" /></intent-filter>
         </activity>
+        <activity android:name="com.qiblalabs.nativebridge.LocationPermissionActivity" android:exported="true" android:excludeFromRecents="true" android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="qiblaastro" android:host="location-permission" /></intent-filter>
+        </activity>
         <receiver android:name="com.qiblalabs.nativebridge.PrayerNotificationReceiver" android:exported="false" />
         <receiver android:name="com.qiblalabs.nativebridge.PrayerBootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.intent.action.TIMEZONE_CHANGED" /><action android:name="android.intent.action.TIME_SET" /><action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" /></intent-filter></receiver>
         <receiver android:name="com.qiblalabs.widget.QiblaWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/qibla_widget_info" /></receiver>
@@ -67,17 +70,36 @@ foreach($activity in @($doc.manifest.application.activity)){
 }
 if(-not $launcher){throw 'Generated MAIN/LAUNCHER activity not found.'}
 $launcher.SetAttribute('name',$androidNs,'com.qiblalabs.nativebridge.QiblaLauncherActivity')
+
+# A token-less bootstrap route is intentionally limited to relaunching the authenticated launcher.
+# It exposes no private token to the calling page and has no Google Play fallback.
+$hasBootstrap=$false
+foreach($filter in @($launcher.'intent-filter')){
+  foreach($data in @($filter.data)){
+    if($data.GetAttribute('scheme',$androidNs)-eq 'qiblaastro' -and $data.GetAttribute('host',$androidNs)-eq 'native-bootstrap'){$hasBootstrap=$true}
+  }
+}
+if(-not $hasBootstrap){
+  $filter=$doc.CreateElement('intent-filter')
+  $action=$doc.CreateElement('action');$action.SetAttribute('name',$androidNs,'android.intent.action.VIEW');[void]$filter.AppendChild($action)
+  foreach($name in @('android.intent.category.DEFAULT','android.intent.category.BROWSABLE')){$category=$doc.CreateElement('category');$category.SetAttribute('name',$androidNs,$name);[void]$filter.AppendChild($category)}
+  $data=$doc.CreateElement('data');$data.SetAttribute('scheme',$androidNs,'qiblaastro');$data.SetAttribute('host',$androidNs,'native-bootstrap');[void]$filter.AppendChild($data)
+  [void]$launcher.AppendChild($filter)
+}
 $doc.Save($Manifest)
 $text=Get-Content -LiteralPath $Manifest -Raw
 
 if($text -match 'android:name=["''](?:com\.qiblalabs\.)?WidgetDataActivity["'']'){throw 'Legacy exported WidgetDataActivity must not return.'}
 if($text -notmatch 'QiblaLauncherActivity'){throw 'Authenticated launcher replacement failed.'}
+if($text -notmatch 'android:host="native-bootstrap"'){throw 'Native bootstrap launcher route injection failed.'}
 if($text -notmatch 'LocationSettingsActivity'){throw 'Authenticated Location settings activity injection failed.'}
+if($text -notmatch 'LocationPermissionActivity'){throw 'Authenticated Location permission activity injection failed.'}
 if($text -notmatch 'android.permission.SCHEDULE_EXACT_ALARM'){throw 'Exact prayer alarm permission injection failed.'}
 $sync=Get-Content -LiteralPath (Join-Path $JavaBridge 'PrayerWidgetSyncActivity.java') -Raw
 $scheduler=Get-Content -LiteralPath (Join-Path $JavaBridge 'PrayerNativeScheduler.java') -Raw
 $token=Get-Content -LiteralPath (Join-Path $JavaBridge 'NativeBridgeToken.java') -Raw
 $location=Get-Content -LiteralPath (Join-Path $JavaBridge 'LocationSettingsActivity.java') -Raw
+$locationPermission=Get-Content -LiteralPath (Join-Path $JavaBridge 'LocationPermissionActivity.java') -Raw
 $locationState=Get-Content -LiteralPath (Join-Path $JavaBridge 'NativeLocationState.java') -Raw
 if($sync -notmatch 'NativeBridgeToken\.valid'){throw 'Prayer/widget sync token validation missing.'}
 if($sync -notmatch 'ACTION_REQUEST_SCHEDULE_EXACT_ALARM'){throw 'Contextual exact-alarm settings request missing.'}
@@ -85,7 +107,9 @@ if($scheduler -notmatch 'setExactAndAllowWhileIdle'){throw 'Prayer-time exact al
 if($token -notmatch 'SecureRandom' -or $token -notmatch 'MODE_PRIVATE'){throw 'Per-install cryptographic private token store missing.'}
 if($sync -notmatch 'MODE_PRIVATE'){throw 'Private native prayer/widget store requirement missing.'}
 if($location -notmatch 'NativeBridgeToken\.valid' -or $location -notmatch 'ACTION_LOCATION_SOURCE_SETTINGS'){throw 'Authenticated Android Location settings bridge missing.'}
+if($locationPermission -notmatch 'NativeBridgeToken\.valid' -or $locationPermission -notmatch 'requestPermissions'){throw 'Authenticated foreground Location permission bridge missing.'}
+if($locationPermission -match 'getLastLocation|getCurrentLocation|requestLocationUpdates|FusedLocationProviderClient'){throw 'Native Location permission bridge must not read coordinates.'}
 if($locationState -notmatch 'isLocationEnabled' -or $locationState -notmatch 'GPS_PROVIDER'){throw 'Android Location service-state reader missing.'}
 $widgetProvider=Get-Content -LiteralPath (Join-Path $JavaWidget 'QiblaWidgetProvider.java') -Raw
 if($widgetProvider -notmatch 'onAppWidgetOptionsChanged' -or $widgetProvider -notmatch 'qibla_widget_compact' -or $widgetProvider -notmatch 'qibla_widget_large'){throw 'Responsive premium widget provider integration missing.'}
-Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + Location settings + responsive translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
+Write-Host 'PASS: authenticated prayer notifications + exact local Adhan + Native bootstrap/Location permission + responsive translated widget integrated; launcher resolved from generated manifest.' -ForegroundColor Green
