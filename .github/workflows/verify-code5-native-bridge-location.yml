@@ -3,6 +3,8 @@ name: Verify code5 native bridge and Location recovery
 on:
   push:
     branches: [fix/code5-native-bridge-location]
+  pull_request:
+    branches: [validation/code5-base]
   workflow_dispatch:
 
 permissions:
