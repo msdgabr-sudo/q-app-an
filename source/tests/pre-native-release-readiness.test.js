@@ -34,9 +34,9 @@ assert(/function\s+tryIPGeo\s*\(\)/.test(gnss),'compatibility alias may remain')
 const permissions=fs.readFileSync('js/presentation/permissions-onboarding.js','utf8');
 assert(/function\s+queryLocationPermission\s*\(/.test(permissions),'onboarding must inspect the browser/TWA geolocation permission state');
 assert(/if\(err&&err\.code===1\)\{finish\('denied'\)/.test(permissions),'only PERMISSION_DENIED may classify location permission as denied');
-assert(/finish\('granted'\);\s*\n\s*\}/.test(permissions),'position timeout/unavailable must not be confused with a denied permission');
-assert(/var\s+notificationResult=currentWebNotificationState\(\)/.test(permissions),'first-run onboarding must not launch a competing notification prompt');
-assert(!/var\s+notificationPromise=requestWebNotifications\(\)/.test(permissions),'legacy concurrent notification/location permission request must remain removed');
+assert(/if\(err&&err\.code===1\)\{finish\('denied'\);return;\}[\s\S]{0,420}settleFromPermission\(\);/.test(permissions),'position timeout/unavailable must resolve from permission state instead of being confused with a denial');
+const firstRunFlow=permissions.slice(permissions.indexOf('async function runPermissionRequest()'),permissions.indexOf('function mountOnboarding('));
+assert(!firstRunFlow.includes('requestWebNotifications('),'first-run location onboarding must not launch a competing Web notification prompt');
 assert(/typeof\s+root\.tryBrowserGPS===['\"]function['\"]/.test(permissions),'successful permission onboarding must hand off to the existing trusted GNSS path');
 
 // Production Android/TWA top-level Back contract. The parent document owns only

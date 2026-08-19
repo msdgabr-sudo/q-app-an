@@ -102,7 +102,7 @@ assert(webSync.includes("q.set('interactive',interactive?'1':'0')"));
 assert(webSync.includes("q.set('onboarding',onboarding?'1':'0')"));
 assert(webSync.includes('intent://prayer-sync?')&&webSync.includes('package=com.qiblalabs'));
 assert(webSync.includes("maybeAutoSync('startup')")&&webSync.includes("maybeAutoSync('location-changed')")&&webSync.includes("maybeAutoSync('runtime-ready')"));
-assert(webSync.includes('if(minute<0)return null'));
+assert(webSync.includes("if(minute<0)return {ready:false,reason:'prayer-times'}"));
 
 // Azkar bridge stays authenticated and independent of this prayer change.
 const azWeb=read('js/azkar-native-reminders.js');
@@ -123,7 +123,7 @@ const bootstrap=read('js/presentation/bootstrap.js');
 assert(bootstrap.includes('loadPrayerCore(loadPermissions);'));
 assert(bootstrap.includes('native-plan.js?v=20260818-adhan-core2')&&bootstrap.includes('schedule-sync.js?v=20260818-adhan-core2'));
 const sw=read('service-worker.js');
-assert(sw.includes("qiblaastro-v6.19-adhan-exact-native"));
+assert(sw.includes("qiblaastro-v6.21-native-location-permission"));
 assert(sw.includes('./js/presentation/prayer/native-plan.js')&&sw.includes('./js/presentation/prayer/schedule-sync.js')&&sw.includes('./js/azkar-native-reminders.js'));
 
 console.log('Native Android localization/security gate: PASS');

@@ -23,7 +23,7 @@ function captureNativeTokenEarly(){
 
 function loadScript(src,marker,onload){if(!root.document)return;if(root.document.querySelector('script['+marker+']')){if(onload)onload();return;}var s=root.document.createElement('script');s.src=src;s.async=false;s.setAttribute(marker,'true');if(onload)s.onload=onload;(root.document.head||root.document.documentElement).appendChild(s);}
 function loadStyle(href,marker){if(!root.document||root.document.querySelector('link['+marker+']'))return;var l=root.document.createElement('link');l.rel='stylesheet';l.href=href;l.setAttribute(marker,'true');(root.document.head||root.document.documentElement).appendChild(l);}
-function loadLocationServiceControl(){loadScript('js/presentation/location-service-control.js?v=20260818-native-location1','data-qibla-location-service-control');}
+function loadLocationServiceControl(){loadScript('js/presentation/location-service-control.js?v=20260819-native-location-permission1','data-qibla-location-service-control');}
 function flushPrayerCore(){var q=prayerCoreWaiters.splice(0);q.forEach(function(fn){try{fn();}catch(_){}});}
 function loadPrayerCore(onready){
   if(typeof onready==='function')prayerCoreWaiters.push(onready);

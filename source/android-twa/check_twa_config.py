@@ -14,8 +14,8 @@ EXPECTED = {
     "host": "app.qiblalabs.com",
     "name": "QiblaAstro ELITE",
     "launcherName": "QiblaAstro",
-    "appVersion": "3.1.1",
-    "appVersionCode": 4,
+    "appVersion": "3.1.2",
+    "appVersionCode": 5,
     "webManifestUrl": "https://app.qiblalabs.com/manifest.json",
     "startUrl": "/?twa=1",
     "fallbackType": "customtabs",
@@ -51,4 +51,4 @@ if fps not in ([],None): fail("twa-manifest fingerprints must remain empty until
 if errors:
     for err in errors: print("ERROR:",err,file=sys.stderr)
     print(f"FAILED: {len(errors)} Android TWA issue(s)",file=sys.stderr); raise SystemExit(1)
-print("PASS: Android TWA identity, release 3.1.1 code4, permissions configuration, and secret boundaries are consistent")
+print("PASS: Android TWA identity, release 3.1.2 code5, permissions configuration, and secret boundaries are consistent")

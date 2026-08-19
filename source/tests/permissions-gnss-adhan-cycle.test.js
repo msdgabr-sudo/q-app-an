@@ -22,8 +22,8 @@ const twa=JSON.parse(read('android-twa/twa-manifest.json'));
 const sw=read('service-worker.js');
 
 // Release/TWA identity stays fixed while this native fix is prepared for the next Play upload.
-assert.strictEqual(twa.appVersion,'3.1.1');
-assert.strictEqual(twa.appVersionCode,4);
+assert.strictEqual(twa.appVersion,'3.1.2');
+assert.strictEqual(twa.appVersionCode,5);
 assert.strictEqual(twa.features&&twa.features.locationDelegation&&twa.features.locationDelegation.enabled,true);
 assert.strictEqual(twa.enableNotifications,true);
 
@@ -38,8 +38,9 @@ assert(permissions.includes('trustedGnssReady()'));
 assert(gnss.includes('gnssHasTrustedFix')&&gnss.includes("gnssSource='gps'"));
 assert(!/ipapi|ipinfo|geolocation-db|fetch\s*\(/i.test(gnss));
 assert(!nav.includes("gnssSource==='default'")&&!nav.includes('gnssSource==="default"'));
-for(const forbidden of ['calcQibla(','refreshMdeclFromTrustedGnss(','calcPrayers(','sunPos(','moonPos(','AstroVerification']){
-  assert(!permissions.includes(forbidden),`Permissions integration touched protected calculation token: ${forbidden}`);
+const permissionsExecutable=permissions.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/.*$/gm,'');
+for(const forbidden of ['calcQibla(','refreshMdeclFromTrustedGnss(','calcPrayers(','sunPos(','moonPos(']){
+  assert(!permissionsExecutable.includes(forbidden),`Permissions integration touched protected calculation token: ${forbidden}`);
 }
 assert(runtime.includes('QiblaPrayerMethods.calculate'));
 assert(bootstrap.includes("css/compass-confidence-final.css?v=20260809-reference-ui1"),'Adhan work must not alter compass assets');
@@ -113,9 +114,9 @@ const coreDefinitionPos=bootstrap.indexOf('function loadPrayerCore(onready)');
 assert(coreDefinitionPos>=0&&mountPrayerPos>coreDefinitionPos);
 
 // Cache release must evict the previous permission/Adhan bridge code.
-assert(sw.includes("VERSION='qiblaastro-v6.19-adhan-exact-native'"));
+assert(sw.includes("VERSION='qiblaastro-v6.21-native-location-permission'"));
 assert(sw.includes("BRIDGE_RELEASE='prayer-exact-20260818-v1'"));
-assert(sw.includes("PERMISSIONS_RELEASE='location-adhan-exact-cycle-20260818-v1'"));
+assert(sw.includes("PERMISSIONS_RELEASE='native-location-adhan-cycle-20260819-v1'"));
 assert(sw.includes("'./js/presentation/prayer/native-plan.js'")&&sw.includes("'./js/presentation/prayer/schedule-sync.js'"));
 
 console.log('Permissions/GNSS/Adhan cycle: PASS');

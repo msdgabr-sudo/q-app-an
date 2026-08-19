@@ -3,7 +3,7 @@
 **Release source:** `main/source`  
 **Package:** `com.qiblalabs`  
 **Origin:** `https://app.qiblalabs.com`  
-**Release:** `3.1.1` / `versionCode 4`  
+**Release:** `3.1.2` / `versionCode 5`
 **Target:** Android 16 / API 36
 
 This document is a release boundary. A permission must not be added merely "just in case". Each permission/capability must have a current user-facing feature, a runtime flow, a privacy disclosure where applicable, and a physical-device acceptance test.
@@ -15,6 +15,7 @@ This document is a release boundary. A permission must not be added merely "just
   - `android.permission.ACCESS_COARSE_LOCATION`
   - `android.permission.ACCESS_FINE_LOCATION`
 - Runtime rule: location permission and acquisition of a trusted high-accuracy GNSS fix are separate states.
+- Native runtime rule: an authenticated, user-initiated Android Activity requests foreground precise Location first; if the device Location service is off, it then opens the system Location settings. Browser/site permission state is not accepted as proof of the Android app grant.
 - Privacy rule: precise coordinates remain functional data and must not be sent by analytics.
 
 ## Notifications
@@ -25,7 +26,7 @@ This document is a release boundary. A permission must not be added merely "just
 - Runtime rule: request contextually from an explicit user action. An enabled Adhan plan is not persisted/scheduled until the notification permission is granted.
 
 ## Exact prayer-time Adhan
-The native background Adhan scheduler is enabled in release `3.1.1 / code4`.
+The native background Adhan scheduler remains enabled in release `3.1.2 / code5`.
 
 Required special access:
 - `android.permission.SCHEDULE_EXACT_ALARM`

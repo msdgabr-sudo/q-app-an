@@ -1,10 +1,10 @@
-/* QiblaAstro Service Worker v6.20 — exact native Adhan + trusted Location bridge cache refresh + Quran/Azkar Back bridges
+/* QiblaAstro Service Worker v6.21 — native precise-Location permission + bridge recovery + Quran/Azkar Back bridges
  * © 2026 Mohamed SG Behairy. All Rights Reserved. */
 'use strict';
-const VERSION='qiblaastro-v6.20-location-service-bridge';
+const VERSION='qiblaastro-v6.21-native-location-permission';
 const BRIDGE_RELEASE='prayer-exact-20260818-v1';
-const GNSS_RELEASE='trusted-location-service-cycle-20260819-v2';
-const PERMISSIONS_RELEASE='location-adhan-exact-cycle-20260819-v2';
+const GNSS_RELEASE='trusted-native-location-permission-20260819-v1';
+const PERMISSIONS_RELEASE='native-location-adhan-cycle-20260819-v1';
 const CACHE_PREFIX='qiblaastro-';
 const APP_CACHE=VERSION+'-app';
 const RUNTIME_CACHE=VERSION+'-runtime';

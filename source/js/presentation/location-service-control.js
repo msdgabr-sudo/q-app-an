@@ -6,10 +6,13 @@
 'use strict';
 var TOKEN_KEY='qiblaastro:native-token';
 var STATE_KEY='qiblaastro:native-location-enabled:v1';
+var PERMISSION_KEY='qiblaastro:native-location-permission:v1';
+var SERVICE_KEY='qiblaastro:native-location-service:v1';
 var BUTTON_ID='qa-location-service-button';
 var STYLE_ID='qa-location-service-style';
 var nativeState=null;
-var permissionGranted=false;
+var nativePermission=null;
+var nativeService=null;
 var gpsAttempted=false;
 var originalTryBrowserGPS=null;
 var observer=null;
@@ -23,27 +26,34 @@ function isTwaSurface(){
   }catch(_){return false;}
 }
 function captureNativeState(){
-  var previous=nativeState,value=null;
+  var previous=[nativeState,nativePermission,nativeService].join('|'),legacy=null,permission=null,service=null;
   try{
     var raw=String(root.location&&root.location.hash||'').replace(/^#/,'');
     if(raw){
       var params=new URLSearchParams(raw),incoming=params.get('nativeLocation');
-      if(incoming==='1'||incoming==='0'){
-        value=incoming==='1';
-        root.sessionStorage.setItem(STATE_KEY,incoming);
-        params.delete('nativeLocation');
+      var incomingPermission=params.get('nativeLocationPermission');
+      var incomingService=params.get('nativeLocationService');
+      var changed=false;
+      if(incoming==='1'||incoming==='0'){legacy=incoming==='1';root.sessionStorage.setItem(STATE_KEY,incoming);params.delete('nativeLocation');changed=true;}
+      if(incomingPermission==='1'||incomingPermission==='0'){permission=incomingPermission==='1';root.sessionStorage.setItem(PERMISSION_KEY,incomingPermission);params.delete('nativeLocationPermission');changed=true;}
+      if(incomingService==='1'||incomingService==='0'){service=incomingService==='1';root.sessionStorage.setItem(SERVICE_KEY,incomingService);params.delete('nativeLocationService');changed=true;}
+      if(changed){
         var clean=params.toString();
         root.history.replaceState(root.history.state||null,'',root.location.pathname+root.location.search+(clean?'#'+clean:''));
       }
     }
-    if(value===null){
-      var saved=root.sessionStorage.getItem(STATE_KEY);
-      if(saved==='1'||saved==='0')value=saved==='1';
-    }
-  }catch(_){value=null;}
-  nativeState=value;
-  if(previous!==nativeState)gpsAttempted=false;
-  return value;
+    var savedLegacy=root.sessionStorage.getItem(STATE_KEY);
+    var savedPermission=root.sessionStorage.getItem(PERMISSION_KEY);
+    var savedService=root.sessionStorage.getItem(SERVICE_KEY);
+    if(legacy===null&&(savedLegacy==='1'||savedLegacy==='0'))legacy=savedLegacy==='1';
+    if(permission===null&&(savedPermission==='1'||savedPermission==='0'))permission=savedPermission==='1';
+    if(service===null&&(savedService==='1'||savedService==='0'))service=savedService==='1';
+  }catch(_){legacy=null;permission=null;service=null;}
+  nativePermission=permission;
+  nativeService=service;
+  nativeState=permission!==null&&service!==null?(permission&&service):legacy;
+  if(previous!==[nativeState,nativePermission,nativeService].join('|'))gpsAttempted=false;
+  return nativeState;
 }
 function trustedFix(){
   try{
@@ -78,7 +88,9 @@ function ensureButton(){
 function renderButton(){
   var b=ensureButton();if(!b)return;
   b.className='';
-  if(nativeState===false){b.textContent='◉ تفعيل الموقع';b.setAttribute('aria-label','تفعيل خدمة الموقع');return;}
+  if(nativePermission===false){b.textContent='◉ منح إذن الموقع';b.setAttribute('aria-label','منح إذن الموقع الدقيق');return;}
+  if(nativeService===false){b.textContent='◉ تفعيل الموقع';b.setAttribute('aria-label','تفعيل خدمة الموقع');return;}
+  if(nativeState===false){b.textContent='◉ إكمال إعداد الموقع';b.setAttribute('aria-label','إكمال إعداد الموقع');return;}
   if(trustedFix()){b.className='qa-location-ready';b.textContent='● الموقع محدد';b.setAttribute('aria-label','تم تحديد الموقع');return;}
   b.className='qa-location-locating';b.textContent='◌ جارٍ تحديد الموقع';b.setAttribute('aria-label','جاري تحديد الموقع');
 }
@@ -92,6 +104,11 @@ function requestExistingGps(force){
 function bridgeUri(){
   var token=nativeToken();if(!token)return '';
   return 'qiblaastro://location-settings?token='+encodeURIComponent(token);
+}
+function recoveryUri(){return'intent://native-bootstrap?reason=location-permission#Intent;scheme=qiblaastro;package=com.qiblalabs;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';}
+function recoverBridge(){
+  var uri=recoveryUri();
+  try{(root.top||root).location.href=uri;return true;}catch(_){try{root.location.href=uri;return true;}catch(__){return false;}}
 }
 function openSettings(){
   if(nativeState!==false)return false;
@@ -109,37 +126,38 @@ function installGpsGuard(){
   };
 }
 function restoreGpsGuard(){if(originalTryBrowserGPS&&root.tryBrowserGPS!==originalTryBrowserGPS&&nativeState===null){root.tryBrowserGPS=originalTryBrowserGPS;originalTryBrowserGPS=null;}}
-function updatePermissionState(){
-  try{
-    if(!root.navigator.permissions||typeof root.navigator.permissions.query!=='function')return;
-    root.navigator.permissions.query({name:'geolocation'}).then(function(status){
-      permissionGranted=status&&status.state==='granted';
-      if(status)status.onchange=function(){permissionGranted=status.state==='granted';syncOnboarding();};
-      syncOnboarding();
-    }).catch(function(){});
-  }catch(_){ }
-}
 function syncOnboarding(){
-  if(!root.document||nativeState!==false||!permissionGranted)return;
+  if(!root.document||nativeState!==false)return;
   var overlay=root.document.getElementById('qa-permission-overlay');if(!overlay)return;
   var btn=root.document.getElementById('qa-permission-allow');
   var state=root.document.querySelector('[data-qa-permission-state="location"]');
   var note=root.document.getElementById('qa-permission-note');
+  var permissionMissing=nativePermission===false;
   if(btn){
     if(btn.dataset.stage!=='location-service')btn.dataset.stage='location-service';
     if(btn.disabled)btn.disabled=false;
-    if(btn.textContent!=='تفعيل الموقع')btn.textContent='تفعيل الموقع';
+    var actionText=permissionMissing?'منح صلاحية الموقع':'تفعيل الموقع';
+    if(btn.textContent!==actionText)btn.textContent=actionText;
   }
   if(state){
-    if(state.textContent!=='خدمة الموقع متوقفة')state.textContent='خدمة الموقع متوقفة';
+    var stateText=permissionMissing?'صلاحية Android مطلوبة':'خدمة الموقع متوقفة';
+    if(state.textContent!==stateText)state.textContent=stateText;
     if(state.className!=='qa-permission-state wait')state.className='qa-permission-state wait';
   }
-  if(note&&note.textContent!=='خدمة الموقع في الهاتف متوقفة. فعّلها للمتابعة.')note.textContent='خدمة الموقع في الهاتف متوقفة. فعّلها للمتابعة.';
+  var noteText=permissionMissing?'امنح QiblaAstro صلاحية الموقع الدقيق من نافذة Android للمتابعة.':'خدمة الموقع في الهاتف متوقفة. فعّلها للمتابعة.';
+  if(note&&note.textContent!==noteText)note.textContent=noteText;
 }
 function interceptOnboarding(event){
-  if(nativeState!==false||!permissionGranted)return;
   var target=event.target&&event.target.closest?event.target.closest('#qa-permission-allow'):null;
-  if(!target)return;
+  if(!target||!isTwaSurface())return;
+  if(!nativeToken()){
+    event.preventDefault();event.stopPropagation();if(event.stopImmediatePropagation)event.stopImmediatePropagation();
+    target.disabled=true;target.textContent='جاري استعادة الربط مع Android...';
+    var recoveryNote=root.document&&root.document.getElementById('qa-permission-note');if(recoveryNote)recoveryNote.textContent='يتم الآن استعادة قناة Android الموثوقة ثم العودة إلى QiblaAstro.';
+    if(!recoverBridge())target.disabled=false;
+    return;
+  }
+  if(nativeState!==false)return;
   event.preventDefault();event.stopPropagation();if(event.stopImmediatePropagation)event.stopImmediatePropagation();
   openSettings();
 }
@@ -152,10 +170,13 @@ function refresh(){
 function handleNativeReturn(){captureNativeState();refresh();}
 function start(){
   captureNativeState();
-  if(!isTwaSurface()||nativeState===null){restoreGpsGuard();return;}
-  ensureStyle();installGpsGuard();updatePermissionState();refresh();
+  if(!isTwaSurface()){restoreGpsGuard();return;}
   if(root.document){
     root.document.addEventListener('click',interceptOnboarding,true);
+  }
+  if(nativeState===null){restoreGpsGuard();return;}
+  ensureStyle();installGpsGuard();refresh();
+  if(root.document){
     try{observer=new MutationObserver(function(){renderButton();syncOnboarding();});observer.observe(root.document.body||root.document.documentElement,{childList:true,subtree:true});}catch(_){ }
   }
   root.addEventListener('hashchange',handleNativeReturn);
@@ -164,6 +185,6 @@ function start(){
   root.document&&root.document.addEventListener('visibilitychange',function(){if(!root.document.hidden){captureNativeState();refresh();}});
   pollTimer=root.setInterval(function(){installGpsGuard();renderButton();syncOnboarding();},1000);
 }
-root.QiblaLocationServiceControl=Object.freeze({isKnownDisabled:isKnownDisabled,isEnabled:function(){return nativeState===true;},openSettings:openSettings,refresh:refresh,getState:function(){return nativeState;}});
+root.QiblaLocationServiceControl=Object.freeze({isKnownDisabled:isKnownDisabled,isEnabled:function(){return nativeState===true;},openSettings:openSettings,recoverBridge:recoverBridge,refresh:refresh,getState:function(){return nativeState;},getDetails:function(){return {ready:nativeState,permission:nativePermission,service:nativeService};}});
 if(root.document){if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',start,{once:true});else start();}
 })(typeof globalThis!=='undefined'?globalThis:window);

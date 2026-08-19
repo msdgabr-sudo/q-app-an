@@ -12,6 +12,8 @@ on:
       - 'source/android-twa/native/prayer-widget/QiblaLauncherActivity.java'
       - 'source/android-twa/apply_native_widget.ps1'
       - 'source/android-twa/check_generated_permissions.py'
+      - 'source/android-twa/check_twa_config.py'
+      - 'source/android-twa/twa-manifest.json'
       - 'source/tests/location-service-cycle.test.js'
       - 'source/tests/service-worker-location-refresh.test.js'
       - '.github/workflows/android-location-service-cycle.yml'
@@ -26,6 +28,8 @@ on:
       - 'source/android-twa/native/prayer-widget/QiblaLauncherActivity.java'
       - 'source/android-twa/apply_native_widget.ps1'
       - 'source/android-twa/check_generated_permissions.py'
+      - 'source/android-twa/check_twa_config.py'
+      - 'source/android-twa/twa-manifest.json'
       - 'source/tests/location-service-cycle.test.js'
       - 'source/tests/service-worker-location-refresh.test.js'
       - '.github/workflows/android-location-service-cycle.yml'
@@ -52,6 +56,8 @@ jobs:
           node --check service-worker.js
       - name: Verify Android Location service recovery contract
         run: node tests/location-service-cycle.test.js
+      - name: Verify Android code5 TWA identity
+        run: python3 android-twa/check_twa_config.py
       - name: Verify Service Worker Location refresh contract
         run: node tests/service-worker-location-refresh.test.js
       - name: Verify existing Trusted GNSS runtime contract
