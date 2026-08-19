@@ -94,6 +94,7 @@ jobs:
           node tests/a2-phone-ui-regressions.test.js
           node tests/permissions-gnss-adhan-cycle.test.js
           node tests/location-service-cycle.test.js
+          node tests/native-bridge-launch-recovery.test.js
           node tests/widget-premium-responsive.test.js
           node tests/astronomical-verification-store-persistence.test.js
           node tests/native-android-localization-security.test.js
