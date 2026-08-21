@@ -49,10 +49,14 @@ for required in ["'?twa=1'","'#nativeToken='+encodeURIComponent(token)",'seedFra
     if required not in azhost: errors.append(f"Azkar iframe native context propagation missing: {required}")
 
 prayerweb=need(Path('js/presentation/prayer/schedule-sync.js'),'qiblaastro://prayer-sync?','Prayer web/native bridge')
-for required in ["reason==='explicit'",'topWin.location.href=uri','intent://prayer-sync?','category=android.intent.category.BROWSABLE',"closest('#qa-adhan-card"]:
-    if required not in prayerweb: errors.append(f"Prayer web bridge missing user-gesture handoff contract: {required}")
-if "setTimeout(function(){try{explicitSync()" in prayerweb:
-    errors.append('Prayer explicit native sync must stay synchronous inside the trusted user click')
+for required in ["reason==='explicit'",'intent://prayer-sync?','category=android.intent.category.BROWSABLE',
+                 "PENDING_SYNC_KEY='qiblaastro:prayer-native-sync-pending:v1'",
+                 "HANDOFF_EVENT='qiblaastro:adhan-settings-committed'",'observeHidden','confirmReturned']:
+    if required not in prayerweb: errors.append(f"Prayer web bridge missing return-confirmed handoff contract: {required}")
+if 'if(launched){markSync(fp)' in prayerweb:
+    errors.append('Prayer bridge must not record URI assignment as a completed native sync')
+if "closest('#qa-adhan-card" in prayerweb:
+    errors.append('Opening the Adhan settings card must not launch Android before a setting is committed')
 
 for dangerous in [
     Path('js/presentation/widget-sync.js'),
@@ -69,5 +73,5 @@ if errors:
     raise SystemExit(1)
 print('PASS: TWA identity, city label, permissions onboarding and service-worker cache are consistent')
 print('PASS: Azkar iframe propagates authenticated TWA context and uses direct custom-scheme navigation from the user gesture')
-print('PASS: Prayer UI synchronously hands the authenticated dated schedule to the published native prayer component from a user gesture')
+print('PASS: Prayer UI hands the authenticated dated schedule to Android and records completion only after the TWA focus round-trip')
 print('PASS: exported widget-data and standalone notification-permission custom-scheme bridges are absent')

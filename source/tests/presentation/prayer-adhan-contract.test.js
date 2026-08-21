@@ -28,7 +28,7 @@ assert.ok(!finalizer.includes('download.tvquran.com'),'remote TVQuran fallback m
 assert.ok(!finalizer.includes('GITHUB_DEFAULT'),'remote GitHub fallback contract must not return');
 assert.ok(!finalizer.includes('trySources'),'multi-remote-source fallback must not return');
 
-assert.match(sw,/const VERSION='qiblaastro-v\d+\.\d+-[^']+'/);
+assert.match(sw,/const VERSION='qiblaastro-(?:v)?\d+\.\d+(?:\.\d+)?-[^']+'/);
 assert.match(sw,/audio-finalizer\.js/);assert.match(sw,/final-polish\.css/);
 assert.match(bootstrap,/audio-finalizer\.js/);
 

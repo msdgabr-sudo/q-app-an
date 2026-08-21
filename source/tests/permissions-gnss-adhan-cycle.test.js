@@ -72,7 +72,7 @@ assert(nativeReceiver.includes('USAGE_ALARM')&&nativeReceiver.includes('rawForAd
 // Service worker and loader must force this exact integration to replace stale first-run code.
 assert(bootstrap.includes('permissions-onboarding.js?v=20260819-code3-location-only1'),'Bootstrap must request the fresh location-only permission asset');
 assert(sw.includes("'./js/presentation/permissions-onboarding.js'"),'Permissions integration must stay in critical cache');
-assert(sw.includes("VERSION='qiblaastro-3.1.0-code3-location-only-r1'"),'Service worker must evict the stale coupled cache');
+assert(sw.includes("VERSION='qiblaastro-3.1.0-code3-adhan-sync-exp1'"),'Experimental service worker must evict the stale prayer handoff cache');
 assert(sw.includes("PERMISSIONS_RELEASE='code3-location-only-20260819-r1'"),'Service worker must advertise the location-only permissions release');
 assert(!sw.includes("'./js/05-gnss.js'"),'Service worker must not activate the unused external GNSS implementation beside the production inline engine');
 
