@@ -88,10 +88,10 @@ assert(azHost.includes('seedFrameContext(frame)'),'Azkar iframe must receive sam
 assert(azPage.includes('#azAudio .az-audio-status{display:none!important}'),'Azkar audio status note must remain hidden; the toggle is the visible state control');
 assert(azPage.includes('azkar-native-reminders.js?v=20260817-native4'),'Azkar page must load the latest direct-native reminder bridge');
 const bootstrap=read('js/presentation/bootstrap.js');
-assert(bootstrap.includes('schedule-sync.js?v=20260821-code3-adhan-sync-exp1'),'return-confirmed prayer sync loader version missing');
+assert(bootstrap.includes('schedule-sync.js?v=20260821-code3-adhan-sync-exp2'),'return-confirmed prayer sync loader version missing');
 const sw=read('service-worker.js');
-assert(sw.includes("VERSION='qiblaastro-3.1.0-code3-adhan-sync-exp1'"),'experimental versioned service-worker cache missing');
-assert(sw.includes("BRIDGE_RELEASE='prayer-return-confirmed-20260821-exp1'"),'return-confirmed prayer bridge release marker missing');
+assert(sw.includes("VERSION='qiblaastro-3.1.0-code3-adhan-sync-exp2'"),'experimental versioned service-worker cache missing');
+assert(sw.includes("BRIDGE_RELEASE='prayer-return-confirmed-20260821-exp2'"),'return-confirmed prayer bridge release marker missing');
 assert(sw.includes('./js/presentation/prayer/native-plan.js')&&sw.includes('./js/presentation/prayer/schedule-sync.js')&&sw.includes('./js/azkar-native-reminders.js'),'native web bridge files must remain in critical offline cache');
 console.log('Native Android localization/security gate: PASS');
 console.log('Prayer actual-time + separate pre-alert + local Adhan audio: PASS');

@@ -5,6 +5,7 @@ const assert=require('assert');
 
 const syncSource=fs.readFileSync('js/presentation/prayer/schedule-sync.js','utf8');
 const uiSource=fs.readFileSync('js/presentation/prayer/adhan-ui.js','utf8');
+const manualPage=fs.readFileSync('adhan-sync-test.html','utf8');
 
 // Static safety contract: this experiment changes only permission + delivery handoff.
 assert(syncSource.includes("PENDING_SYNC_KEY='qiblaastro:prayer-native-sync-pending:v1'"));
@@ -16,6 +17,9 @@ assert(!syncSource.includes("closest('#qa-adhan-card"), 'opening the Adhan card 
 assert(uiSource.includes("commitNativeSync('master-toggle',enabled())"), 'enabling Adhan must request permission and commit native sync');
 assert(uiSource.includes("commitNativeSync('prayer-mode',m!=='off')"), 'full Adhan and notification modes must both request notification permission');
 assert(uiSource.includes("status==='returned')announce('تم إرسال جدول الصلاة إلى Android')"), 'existing live status must report the Android handoff return without changing layout');
+assert(syncSource.includes('/\\/adhan-sync-test\\.html$/'), 'navigation adapter must be isolated to the standalone test page');
+assert(manualPage.includes('js/presentation/prayer/schedule-sync.js?v=20260821-code3-adhan-sync-exp2'), 'standalone test must load the real experimental handoff source');
+assert(manualPage.includes('runSuccessfulReturn')&&manualPage.includes('runUnconfirmedFailure'), 'standalone test must prove both confirmed return and rejected false success');
 for(const forbidden of ['calcQibla(','refreshMdeclFromTrustedGnss(','calcPrayers(','sunPos(','moonPos(','Math.atan2']){
   assert(!syncSource.includes(forbidden),`native handoff must not touch protected calculation token: ${forbidden}`);
   assert(!uiSource.includes(forbidden),`Adhan UI must not touch protected calculation token: ${forbidden}`);

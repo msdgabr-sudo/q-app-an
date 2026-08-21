@@ -52,7 +52,8 @@ function clearPending(){removeStorage(root.sessionStorage,PENDING_SYNC_KEY);if(f
 function emitStatus(status,detail){try{root.dispatchEvent(new CustomEvent('qiblaastro:prayer-native-sync-status',{detail:Object.assign({status:status},detail||{})}));}catch(_){} }
 function directUri(q){return'qiblaastro://prayer-sync?'+q.toString();}
 function fallbackIntent(q){return'intent://prayer-sync?'+q.toString()+'#Intent;scheme=qiblaastro;package=com.qiblalabs;category=android.intent.category.BROWSABLE;end';}
-function navigate(uri){try{(root.top||root).location.href=uri;return true;}catch(_){try{root.location.href=uri;return true;}catch(__){return false;}}}
+function isolatedTestAdapter(){try{var path=String(root.location&&root.location.pathname||'');var adapter=root.QiblaAdhanSyncTestAdapter;return /\/adhan-sync-test\.html$/.test(path)&&adapter&&adapter.enabled===true&&typeof adapter.navigate==='function'?adapter:null;}catch(_){return null;}}
+function navigate(uri){var adapter=isolatedTestAdapter();if(adapter){try{return adapter.navigate(uri)!==false;}catch(_){return false;}}try{(root.top||root).location.href=uri;return true;}catch(_){try{root.location.href=uri;return true;}catch(__){return false;}}}
 function observeHidden(){var pending=readPending();if(!pending)return;pending.hidden=true;pending.hiddenAt=Date.now();writePending(pending);emitStatus('android-opened',{reason:pending.reason});}
 function confirmReturned(){var pending=readPending();if(!pending||!pending.hidden)return false;if(Date.now()-Number(pending.at||0)>HANDOFF_WINDOW_MS){clearPending();emitStatus('expired',{reason:pending.reason});return false;}markSync(pending.fp);clearPending();emitStatus('returned',{reason:pending.reason,fingerprint:pending.fp});return true;}
 function launchBridge(q,reason,fp){

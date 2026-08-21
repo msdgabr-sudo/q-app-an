@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>اختبار مزامنة الأذان — QiblaAstro Code 3</title>
+  <style>
+    :root{color-scheme:dark;--bg:#050914;--panel:#0d1828;--line:#263a50;--gold:#e3bb57;--ok:#55d98b;--bad:#ff7880;--muted:#9aacc1}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,#162647 0,#070c18 45%,var(--bg) 100%);color:#f5f7fb;font-family:"Noto Sans Arabic",Tahoma,Arial,sans-serif;padding:22px}
+    main{width:min(720px,100%);margin:auto}.brand{text-align:center;margin:10px 0 24px}.brand b{display:block;color:var(--gold);font:700 34px Georgia,serif}.brand span{color:var(--muted);font-size:13px;letter-spacing:.08em}
+    .card{background:rgba(13,24,40,.94);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 18px 50px #0007}.intro{line-height:1.9;color:#d8e1ed;margin:0 0 18px}.steps{display:grid;gap:10px;margin:18px 0}.step{display:grid;grid-template-columns:34px 1fr auto;gap:11px;align-items:center;background:#101e31;border:1px solid #24384e;border-radius:14px;padding:13px}.n{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#1d3048;color:var(--gold);font-weight:800}.step b{font-size:14px}.step small{display:block;color:var(--muted);margin-top:3px}.state{font-weight:800;font-size:13px;color:var(--muted)}.step.pass{border-color:#276845}.step.pass .state{color:var(--ok)}.step.fail{border-color:#79363b}.step.fail .state{color:var(--bad)}
+    button{width:100%;min-height:50px;border:0;border-radius:14px;background:linear-gradient(135deg,#e8c35f,#b98a28);color:#171005;font:800 16px inherit;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.summary{margin:14px 0 0;text-align:center;font-weight:800;min-height:28px}.summary.pass{color:var(--ok)}.summary.fail{color:var(--bad)}
+    details{margin-top:15px;border-top:1px solid var(--line);padding-top:13px;color:var(--muted)}pre{direction:ltr;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;background:#050a12;padding:12px;border-radius:12px;font:12px/1.6 monospace;color:#bed0e5}
+    .note{margin:16px 0 0;border-right:3px solid var(--gold);padding:10px 12px;background:#161b22;color:#cdd7e4;font-size:13px;line-height:1.8}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand"><b>QiblaAstro</b><span>CODE 3 · ADHAN HANDOFF TEST</span></div>
+  <section class="card">
+    <p class="intro">اختبار مستقل يشغّل ملف المزامنة التجريبي الحقيقي، ويثبت أن محاولة فتح Android لا تُسجَّل نجاحًا قبل عودة التطبيق، وأن المحاولة التي لا تعود من Android تُرفض ولا تُحفظ.</p>
+    <div class="steps">
+      <div class="step" id="step-load"><span class="n">1</span><span><b>تحميل كود المزامنة الحقيقي</b><small>نفس الملف المستخدم في الفرع التجريبي</small></span><span class="state">جارٍ</span></div>
+      <div class="step" id="step-return"><span class="n">2</span><span><b>محاولة صحيحة وعودة Android</b><small>Pending → خروج → عودة → اعتماد</small></span><span class="state">جارٍ</span></div>
+      <div class="step" id="step-failure"><span class="n">3</span><span><b>منع النجاح الزائف</b><small>محاولة بلا عودة يجب ألا تُعتمد</small></span><span class="state">جارٍ</span></div>
+    </div>
+    <button id="run" type="button">إعادة تشغيل الاختبار</button>
+    <p class="summary" id="summary" role="status" aria-live="polite"></p>
+    <details><summary>السجل التقني</summary><pre id="log"></pre></details>
+    <p class="note">هذا الاختبار يثبت منطق Web→Native داخل الفرع. لا يدّعي تشغيل منبّه Android الفعلي؛ ذلك لا يمكن إثباته من المتصفح المنفصل لأنه لا يملك الرمز السري الموجود داخل نسخة Play.</p>
+  </section>
+</main>
+<script>
+'use strict';
+var LAT=30.0444,LON=31.2357,gnssSource='gps',QT=136.2;
+var pCache=[{n:'الفجر',h:4.5},{n:'الظهر',h:12.1},{n:'العصر',h:15.5},{n:'المغرب',h:18.4},{n:'العشاء',h:19.8}];
+var technicalLog=[],syncStatuses=[],lastNavigation='';
+function log(message){technicalLog.push(new Date().toISOString().slice(11,23)+'  '+message);document.getElementById('log').textContent=technicalLog.join('\n');}
+function setStep(id,ok,text){var el=document.getElementById(id);el.classList.remove('pass','fail');el.classList.add(ok?'pass':'fail');el.querySelector('.state').textContent=text|| (ok?'نجح':'فشل');}
+function resetStep(id){var el=document.getElementById(id);el.classList.remove('pass','fail');el.querySelector('.state').textContent='جارٍ';}
+function wait(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
+function storageClear(){sessionStorage.removeItem('qiblaastro:prayer-native-sync-last:v1');sessionStorage.removeItem('qiblaastro:prayer-native-sync-pending:v1');}
+sessionStorage.setItem('qiblaastro:native-token','t'.repeat(40));
+window.QiblaAdhanSyncTestAdapter={enabled:true,navigate:function(uri){lastNavigation=String(uri);log('NAV '+lastNavigation.slice(0,115)+'…');return true;}};
+window.QiblaPrayerLocation={effective:function(){return{mode:'auto',lat:LAT,lon:LON,label:'القاهرة',timeZone:'Africa/Cairo'};}};
+window.QiblaAdhanUI={getState:function(){return{enabled:true,advance:0,profile:'makkah',prayers:{'الفجر':'adhan','الظهر':'adhan','العصر':'adhan','المغرب':'adhan','العشاء':'adhan'}};}};
+window.QiblaPrayerNativePlan={build:function(){return{timeZone:'Africa/Cairo'};},serialize:function(){return'2026-08-21:270,726,930,1104,1188|2026-08-22:271,726,929,1103,1187';}};
+window.addEventListener('qiblaastro:prayer-native-sync-status',function(e){var status=e&&e.detail&&e.detail.status||'unknown';syncStatuses.push(status);log('STATUS '+status);});
+async function runSuccessfulReturn(){storageClear();syncStatuses=[];lastNavigation='';var launched=window.QiblaPrayerNativeSync.sync();var before=window.QiblaPrayerNativeSync.status();var attempted=launched&&lastNavigation.indexOf('intent://prayer-sync?')===0&&lastNavigation.indexOf('package=com.qiblalabs')>0&&before.pending&&!before.last;log('BEFORE_RETURN pending='+!!before.pending+' last='+!!before.last);window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pageshow'));var after=window.QiblaPrayerNativeSync.status();var accepted=attempted&&!after.pending&&!!after.last&&syncStatuses.indexOf('android-opened')>=0&&syncStatuses.indexOf('returned')>=0;log('AFTER_RETURN pending='+!!after.pending+' last='+!!after.last);return accepted;}
+async function runUnconfirmedFailure(){storageClear();syncStatuses=[];lastNavigation='';var launched=window.QiblaPrayerNativeSync.sync();var before=window.QiblaPrayerNativeSync.status();log('UNCONFIRMED_START pending='+!!before.pending+' last='+!!before.last);await wait(6300);var after=window.QiblaPrayerNativeSync.status();var rejected=launched&&!!before.pending&&!before.last&&!after.pending&&!after.last&&syncStatuses.indexOf('launch-unconfirmed')>=0;log('UNCONFIRMED_END pending='+!!after.pending+' last='+!!after.last);return rejected;}
+async function runAll(){var button=document.getElementById('run'),summary=document.getElementById('summary');button.disabled=true;technicalLog=[];syncStatuses=[];summary.className='summary';summary.textContent='جارٍ تشغيل الاختبار المنفصل…';['step-load','step-return','step-failure'].forEach(resetStep);try{var loaded=!!(window.QiblaPrayerNativeSync&&window.QiblaPrayerNativeSync.sync);setStep('step-load',loaded,loaded?'نجح':'فشل');if(!loaded)throw new Error('لم يتم تحميل ملف المزامنة');var returned=await runSuccessfulReturn();setStep('step-return',returned,returned?'نجح':'فشل');var rejected=await runUnconfirmedFailure();setStep('step-failure',rejected,rejected?'نجح':'فشل');var all=loaded&&returned&&rejected;summary.className='summary '+(all?'pass':'fail');summary.textContent=all?'نجح الاختبار: لا يوجد اعتماد زائف للمزامنة':'فشل الاختبار: راجع السجل التقني';}catch(error){log('ERROR '+error.message);summary.className='summary fail';summary.textContent='فشل الاختبار: '+error.message;}finally{button.disabled=false;}}
+document.getElementById('run').addEventListener('click',runAll);
+</script>
+<script src="js/presentation/prayer/schedule-sync.js?v=20260821-code3-adhan-sync-exp2" onload="runAll()" onerror="setStep('step-load',false,'فشل');document.getElementById('summary').textContent='تعذر تحميل ملف المزامنة'"></script>
+</body>
+</html>
