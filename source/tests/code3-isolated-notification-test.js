@@ -1,5 +1,6 @@
 const fs = require('fs');
 const assert = require('assert');
+const vm = require('vm');
 
 const page = fs.readFileSync('notification-test/index.html', 'utf8');
 const app = fs.readFileSync('notification-test/app.js', 'utf8');
@@ -19,3 +20,68 @@ assert(!page.includes('nativeToken=') && !app.includes('nativeToken=') && !worke
 console.log('Code 3 isolated web notification experiment: PASS');
 console.log('Security boundary (no native token in external preview): PASS');
 console.log('Evidence boundary (short web test is not Android closed-app proof): PASS');
+
+(async function executeWorkerContract() {
+  const handlers = {};
+  const stored = new Map();
+  const shown = [];
+  const opened = [];
+  const clientMessages = [];
+  const fakeClient = { postMessage(value) { clientMessages.push(value); } };
+  const context = {
+    URL,
+    Response,
+    Promise,
+    Number,
+    Math,
+    Date,
+    String,
+    setTimeout,
+    caches: {
+      async open() {
+        return {
+          async put(key, response) { stored.set(String(key), await response.text()); },
+          async match(key) { return stored.has(String(key)) ? new Response(stored.get(String(key))) : undefined; }
+        };
+      }
+    },
+    self: {
+      location: { href: 'https://example.test/notification-test/sw.js' },
+      registration: { async showNotification(title, options) { shown.push({ title, options }); } },
+      clients: {
+        async matchAll() { return [fakeClient]; },
+        async claim() {},
+        async openWindow(url) { opened.push(url); }
+      },
+      async skipWaiting() {},
+      addEventListener(name, handler) { handlers[name] = handler; }
+    }
+  };
+  vm.runInNewContext(worker, context, { filename: 'notification-test/sw.js' });
+  assert.strictEqual(context.safeDelay(999999), 60000, 'worker must clamp manual delays to one minute');
+
+  let schedulePromise;
+  handlers.message({
+    data: { type: 'QA_NOTIFY_SCHEDULE', delayMs: 0, testId: 'contract-probe' },
+    waitUntil(value) { schedulePromise = value; }
+  });
+  await schedulePromise;
+  assert.strictEqual(shown.length, 1, 'worker must invoke showNotification once');
+  assert.strictEqual(shown[0].options.data.testId, 'contract-probe');
+  assert(clientMessages.some(value => value.status && value.status.state === 'shown'), 'worker must publish shown evidence');
+
+  let clickPromise;
+  let closed = false;
+  handlers.notificationclick({
+    notification: { data: shown[0].options.data, close() { closed = true; } },
+    waitUntil(value) { clickPromise = value; }
+  });
+  await clickPromise;
+  assert.strictEqual(closed, true, 'notification click must close the notification');
+  const saved = JSON.parse(Array.from(stored.values()).pop());
+  assert.strictEqual(saved.state, 'clicked', 'notification click evidence must persist');
+  console.log('Worker runtime contract (schedule -> show -> click evidence): PASS');
+}()).catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
