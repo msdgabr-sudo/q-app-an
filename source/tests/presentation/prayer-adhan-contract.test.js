@@ -3,27 +3,29 @@ const ui=fs.readFileSync('js/presentation/prayer/adhan-ui.js','utf8');
 const engine=fs.readFileSync('js/02-adhan.js','utf8');
 const readiness=fs.readFileSync('js/presentation/prayer/audio-readiness.js','utf8');
 const finalizer=fs.readFileSync('js/presentation/prayer/audio-finalizer.js','utf8');
+const policy=fs.readFileSync('js/presentation/prayer/online-adhan-policy.js','utf8');
 const bootstrap=fs.readFileSync('js/presentation/bootstrap.js','utf8');
 const sw=fs.readFileSync('service-worker.js','utf8');
 const page=fs.readFileSync('pages/prayer.html','utf8');
 const css=fs.readFileSync('css/presentation/prayer/refinement.css','utf8');
 const polish=fs.readFileSync('css/presentation/prayer/final-polish.css','utf8');
 
-assert.match(ui,/makkah:\{/);assert.match(ui,/calm:\{/);assert.match(ui,/deep:\{/);
+assert.match(ui,/makkah:Object\.assign/);assert.match(ui,/calm:Object\.assign/);assert.match(ui,/deep:Object\.assign/);
 ['الأذان الأساسي','أذان أحمد النفيس','أذان إسلام صبحي'].forEach(x=>assert.ok(ui.includes(x),x));
 assert.ok(!ui.includes('www.islamcan.com'),'IslamCan UI dependency must not return');
 assert.ok(!engine.includes('www.islamcan.com'),'IslamCan engine default must not return');
 
-// Release contract: user-selectable muezzin playback is local/offline and deterministic.
+// Experiment contract: web playback is first-party HTTPS; packaged assets remain untouched for rollback/native code 3.
 for(const asset of ['audio/adhan/mecca.mp3','audio/adhan/ahmed-al-nufais.mp3','audio/adhan/islam-sobhi.mp3','audio/adhan/fajr-alafasy.mp3']){
-  assert.ok(finalizer.includes(asset),'finalizer missing local Adhan asset: '+asset);
+  assert.ok(policy.includes(asset),'online policy missing first-party Adhan path: '+asset);
   assert.ok(sw.includes(asset),'Service Worker missing local Adhan asset: '+asset);
   assert.ok(fs.existsSync(asset),'local Adhan file missing: '+asset);
 }
-assert.match(finalizer,/var LOCAL=\{/);
-assert.match(finalizer,/FALLBACK=LOCAL\.makkah\.normal/);
+assert.match(finalizer,/var ONLINE=\{/);
+assert.match(finalizer,/FALLBACK=ONLINE\.makkah\.normal/);
 assert.match(finalizer,/playStrict/);
 assert.match(finalizer,/audio timeout/);
+assert.match(policy,/https:\/\/app\.qiblalabs\.com/);
 assert.ok(!finalizer.includes('download.tvquran.com'),'remote TVQuran fallback must not return');
 assert.ok(!finalizer.includes('GITHUB_DEFAULT'),'remote GitHub fallback contract must not return');
 assert.ok(!finalizer.includes('trySources'),'multi-remote-source fallback must not return');
@@ -43,4 +45,4 @@ assert.match(readiness,/AudioContext/);assert.match(readiness,/createOscillator/
 ['.qa-chevron','.qa-sheet-arrow','.qa-sheet-option.selected','.qa-sheet-back','.qa-sheet-close','focus-visible','prefers-reduced-motion','.qa-audio-readiness','data-state="ready"'].forEach(token=>assert.ok(css.includes(token),token));assert.match(css,/border-radius:15px/);assert.match(css,/grid-template-columns:44px 1fr 44px/);assert.match(css,/min-height:44px/);
 ['qa-quick-setting small','qa-sheet-option small','qa-sheet-note','qa-adhan-live-status','qa-audio-readiness-copy small'].forEach(token=>assert.ok(polish.includes(token),token));
 ['calcPrayers','solarNoon','sunDeclination','Math.atan2','KAABA_LAT','KAABA_LON'].forEach(token=>assert.ok(!ui.includes(token),'forbidden calculation token: '+token));
-console.log('Prayer Adhan local/offline presentation contract: PASS');
+console.log('Prayer Adhan online-visible experiment + retained rollback assets: PASS');

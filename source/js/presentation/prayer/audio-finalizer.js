@@ -1,30 +1,31 @@
 /* QiblaAstro — Final adhan playback guard
  * Presentation/audio transport only. No prayer-time calculations.
- * Local, deterministic muezzin assets for reliable offline playback.
+ * Experiment: first-party HTTPS muezzin assets while the page is visible.
  * © 2026 محمد سيد جبر بحيرى — Mohamed SG Behairy. All Rights Reserved.
  */
 (function(root){'use strict';
-  var LOCAL={
-    makkah:{normal:'audio/adhan/mecca.mp3',fajr:'audio/adhan/fajr-alafasy.mp3'},
-    calm:{normal:'audio/adhan/ahmed-al-nufais.mp3',fajr:'audio/adhan/fajr-alafasy.mp3'},
-    deep:{normal:'audio/adhan/islam-sobhi.mp3',fajr:'audio/adhan/fajr-alafasy.mp3'}
+  var policy=root.QiblaOnlineAdhanPolicy;
+  var ONLINE={
+    makkah:policy.profile('makkah'),
+    calm:policy.profile('calm'),
+    deep:policy.profile('deep')
   };
-  var FALLBACK=LOCAL.makkah.normal;
+  var FALLBACK=ONLINE.makkah.normal;
   var previewAudio=null,attemptToken=0,bound=false,mapperInstalled=false;
 
   function status(text){var el=document.getElementById('qa-adhan-live-status');if(!el)return;el.textContent='';setTimeout(function(){el.textContent=text||'';},20);}
   function state(){try{return root.QiblaAdhanUI&&root.QiblaAdhanUI.getState?root.QiblaAdhanUI.getState():{profile:'makkah'};}catch(e){return {profile:'makkah'};}}
-  function profile(){var s=state();return LOCAL[s.profile]||LOCAL.makkah;}
+  function profile(){var s=state();return ONLINE[s.profile]||ONLINE.makkah;}
 
-  function localizeURL(url,isFajr){
+  function onlineURL(url,isFajr){
     var u=String(url||'');
-    if(isFajr)return LOCAL.makkah.fajr;
-    if(u.indexOf('Ahmed%20Al-Nufais')>=0||u.indexOf('Ahmed Al-Nufais')>=0)return LOCAL.calm.normal;
-    if(u.indexOf('islam-sobhi-adhan.mp3')>=0||u.indexOf('IslamSobhi.mp3')>=0)return LOCAL.deep.normal;
-    if(u.indexOf('audio/adhan/ahmed-al-nufais.mp3')>=0)return LOCAL.calm.normal;
-    if(u.indexOf('audio/adhan/islam-sobhi.mp3')>=0)return LOCAL.deep.normal;
-    if(u.indexOf('audio/adhan/mecca.mp3')>=0)return LOCAL.makkah.normal;
-    return LOCAL.makkah.normal;
+    if(isFajr)return ONLINE.makkah.fajr;
+    if(u.indexOf('Ahmed%20Al-Nufais')>=0||u.indexOf('Ahmed Al-Nufais')>=0)return ONLINE.calm.normal;
+    if(u.indexOf('islam-sobhi-adhan.mp3')>=0||u.indexOf('IslamSobhi.mp3')>=0)return ONLINE.deep.normal;
+    if(u.indexOf('audio/adhan/ahmed-al-nufais.mp3')>=0)return ONLINE.calm.normal;
+    if(u.indexOf('audio/adhan/islam-sobhi.mp3')>=0)return ONLINE.deep.normal;
+    if(u.indexOf('audio/adhan/mecca.mp3')>=0)return ONLINE.makkah.normal;
+    return ONLINE.makkah.normal;
   }
 
   function installURLMapper(){
@@ -32,7 +33,7 @@
     mapperInstalled=true;
     var original=root.adhanSetAudioURLs;
     root.adhanSetAudioURLs=function(normalURL,fajrURL,fallbackURL){
-      return original(localizeURL(normalURL,false),localizeURL(fajrURL,true),FALLBACK);
+      return original(onlineURL(normalURL,false),onlineURL(fajrURL,true),FALLBACK);
     };
   }
 
@@ -87,6 +88,6 @@
     },true);
   }
 
-  root.QiblaPrayerAudioFinalizer=Object.freeze({bind:bind,preview:preview,stop:stop,syncEngine:syncEngine,profiles:LOCAL});
+  root.QiblaPrayerAudioFinalizer=Object.freeze({bind:bind,preview:preview,stop:stop,syncEngine:syncEngine,profiles:ONLINE});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(bind,0);},{once:true});else setTimeout(bind,0);
 })(typeof globalThis!=='undefined'?globalThis:window);

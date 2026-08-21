@@ -5,6 +5,7 @@ const assert=require('assert');
 
 const syncSource=fs.readFileSync('js/presentation/prayer/schedule-sync.js','utf8');
 const uiSource=fs.readFileSync('js/presentation/prayer/adhan-ui.js','utf8');
+const policySource=fs.readFileSync('js/presentation/prayer/online-adhan-policy.js','utf8');
 
 // Static safety contract: this experiment changes only permission + delivery handoff.
 assert(syncSource.includes("PENDING_SYNC_KEY='qiblaastro:prayer-native-sync-pending:v1'"));
@@ -16,6 +17,8 @@ assert(!syncSource.includes("closest('#qa-adhan-card"), 'opening the Adhan card 
 assert(uiSource.includes("commitNativeSync('master-toggle',enabled())"), 'enabling Adhan must request permission and commit native sync');
 assert(uiSource.includes("commitNativeSync('prayer-mode',m!=='off')"), 'full Adhan and notification modes must both request notification permission');
 assert(uiSource.includes("status==='returned')announce('تم إرسال جدول الصلاة إلى Android')"), 'existing live status must report the Android handoff return without changing layout');
+assert(syncSource.includes("q.set('m_'+id,nativeNoticeMode("), 'closed-app native schedule must receive notification-only modes');
+assert(policySource.includes("function nativeMode(mode){return mode==='off'?'off':'notification';}"), 'online experiment must fail closed to native notifications');
 for(const forbidden of ['calcQibla(','refreshMdeclFromTrustedGnss(','calcPrayers(','sunPos(','moonPos(','Math.atan2']){
   assert(!syncSource.includes(forbidden),`native handoff must not touch protected calculation token: ${forbidden}`);
   assert(!uiSource.includes(forbidden),`Adhan UI must not touch protected calculation token: ${forbidden}`);
@@ -63,6 +66,7 @@ vm.runInNewContext(syncSource,context,{filename:'schedule-sync.js'});
 assert.strictEqual(context.QiblaPrayerNativeSync.sync(),true,'explicit settings handoff must launch the code-3 Android bridge');
 assert(navigated.startsWith('intent://prayer-sync?'),'explicit handoff must prefer the package-scoped Android intent');
 assert(navigated.includes('package=com.qiblalabs'),'intent must remain restricted to the existing package');
+assert(navigated.includes('m_fajr=notification')&&!navigated.includes('m_fajr=adhan'),'native handoff must never request background Adhan audio in this experiment');
 assert(sessionStorage.getItem('qiblaastro:prayer-native-sync-pending:v1'),'handoff attempt must remain pending until Android takes focus');
 assert.strictEqual(sessionStorage.getItem('qiblaastro:prayer-native-sync-last:v1'),null,'attempt must not be marked completed immediately');
 

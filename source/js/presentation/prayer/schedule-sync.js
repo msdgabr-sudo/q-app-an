@@ -11,6 +11,7 @@ var LAST_SYNC_KEY='qiblaastro:prayer-native-sync-last:v1';
 var PENDING_SYNC_KEY='qiblaastro:prayer-native-sync-pending:v1';
 var HANDOFF_EVENT='qiblaastro:adhan-settings-committed';
 var HANDOFF_WINDOW_MS=20000,FALLBACK_DELAY_MS=1200,ATTEMPT_EXPIRY_MS=6000;
+var onlinePolicy=root.QiblaOnlineAdhanPolicy;
 
 function readStorage(store,key){try{return store&&store.getItem?store.getItem(key)||'':'';}catch(_){return '';}}
 function writeStorage(store,key,value){try{if(store&&store.setItem)store.setItem(key,value);}catch(_){}}
@@ -50,6 +51,7 @@ function readPending(){try{var raw=readStorage(root.sessionStorage,PENDING_SYNC_
 function writePending(value){writeStorage(root.sessionStorage,PENDING_SYNC_KEY,JSON.stringify(value));}
 function clearPending(){removeStorage(root.sessionStorage,PENDING_SYNC_KEY);if(fallbackTimer){root.clearTimeout(fallbackTimer);fallbackTimer=0;}if(expiryTimer){root.clearTimeout(expiryTimer);expiryTimer=0;}}
 function emitStatus(status,detail){try{root.dispatchEvent(new CustomEvent('qiblaastro:prayer-native-sync-status',{detail:Object.assign({status:status},detail||{})}));}catch(_){} }
+function nativeNoticeMode(mode){return onlinePolicy&&typeof onlinePolicy.nativeMode==='function'?onlinePolicy.nativeMode(mode):(mode==='off'?'off':'notification');}
 function directUri(q){return'qiblaastro://prayer-sync?'+q.toString();}
 function fallbackIntent(q){return'intent://prayer-sync?'+q.toString()+'#Intent;scheme=qiblaastro;package=com.qiblalabs;category=android.intent.category.BROWSABLE;end';}
 function navigate(uri){try{(root.top||root).location.href=uri;return true;}catch(_){try{root.location.href=uri;return true;}catch(__){return false;}}}
@@ -70,7 +72,7 @@ function launchBridge(q,reason,fp){
   expiryTimer=root.setTimeout(function(){var pending=readPending();if(pending&&!pending.hidden){clearPending();emitStatus('launch-unconfirmed',{reason:reason});}},ATTEMPT_EXPIRY_MS);
   return true;
 }
-function nativeSync(reason){var payload=nativePayload();if(!payload)return false;var fp=fingerprint(payload);if(!fp)return false;if(reason!=='explicit'&&reason!=='settings-committed'&&lastSync()===fp)return true;var token=payload.token,loc=payload.loc,st=payload.st,q=new URLSearchParams();q.set('token',token);q.set('notify',st.enabled?'1':'0');q.set('city',loc.label||'');q.set('tz',payload.plan.timeZone||loc.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'');q.set('plan',payload.planText);var h=root.document&&root.document.getElementById('pr-h');q.set('hijri',h&&h.textContent?h.textContent:'');try{if(Number.isFinite(Number(QT)))q.set('qibla',Number(QT).toFixed(1));}catch(_){}q.set('advance',String(st.advance||0));q.set('profile',st.profile||'makkah');Object.keys(payload.map).forEach(function(id){q.set('t_'+id,String(payload.times[id]));q.set('m_'+id,(st.prayers&&st.prayers[payload.map[id]])||'off');});var launched=launchBridge(q,reason,fp);if(launched&&(reason==='explicit'||reason==='settings-committed'))setAutoEnabled();return launched;}
+function nativeSync(reason){var payload=nativePayload();if(!payload)return false;var fp=fingerprint(payload);if(!fp)return false;if(reason!=='explicit'&&reason!=='settings-committed'&&lastSync()===fp)return true;var token=payload.token,loc=payload.loc,st=payload.st,q=new URLSearchParams();q.set('token',token);q.set('notify',st.enabled?'1':'0');q.set('city',loc.label||'');q.set('tz',payload.plan.timeZone||loc.timeZone||Intl.DateTimeFormat().resolvedOptions().timeZone||'');q.set('plan',payload.planText);var h=root.document&&root.document.getElementById('pr-h');q.set('hijri',h&&h.textContent?h.textContent:'');try{if(Number.isFinite(Number(QT)))q.set('qibla',Number(QT).toFixed(1));}catch(_){}q.set('advance',String(st.advance||0));q.set('profile',st.profile||'makkah');Object.keys(payload.map).forEach(function(id){q.set('t_'+id,String(payload.times[id]));q.set('m_'+id,nativeNoticeMode((st.prayers&&st.prayers[payload.map[id]])||'off'));});var launched=launchBridge(q,reason,fp);if(launched&&(reason==='explicit'||reason==='settings-committed'))setAutoEnabled();return launched;}
 function maybeAutoSync(reason){if(!captureToken())return false;if(!autoEnabled()&&!hasExplicitPrayerPrefs())return false;return nativeSync(reason||'auto');}
 function explicitSync(reason){return nativeSync(reason||'explicit');}
 function retryCommittedSync(attempt){if(explicitSync('settings-committed'))return;attempt=Number(attempt)||0;if(attempt<5)root.setTimeout(function(){retryCommittedSync(attempt+1);},300);else emitStatus('payload-not-ready',{reason:'settings-committed'});}

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>تجربة الأذان عبر الإنترنت — QiblaAstro Code 3</title>
+  <style>
+    :root{color-scheme:dark;--bg:#050914;--panel:#0d1828;--line:#294159;--gold:#e2ba57;--ok:#55d98b;--bad:#ff7880;--muted:#9fb0c4}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:22px;background:radial-gradient(circle at 50% 0,#17284b,#070c18 48%,var(--bg));color:#f6f8fb;font-family:Tahoma,Arial,sans-serif}main{width:min(720px,100%);margin:auto}.brand{text-align:center;margin:12px 0 22px}.brand b{display:block;color:var(--gold);font:700 34px Georgia,serif}.brand span{color:var(--muted);font-size:12px;letter-spacing:.08em}.card{background:#0d1828f2;border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 18px 50px #0008}.intro,.note{line-height:1.85;color:#d7e0eb}.steps{display:grid;gap:10px;margin:18px 0}.step{display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:center;padding:13px;background:#102035;border:1px solid #294159;border-radius:14px}.n{display:grid;place-items:center;width:29px;height:29px;border-radius:50%;background:#203650;color:var(--gold);font-weight:800}.step b{font-size:14px}.step small{display:block;color:var(--muted);margin-top:4px}.state{font-size:13px;font-weight:800;color:var(--muted)}.pass{border-color:#2c754e}.pass .state{color:var(--ok)}.fail{border-color:#813b42}.fail .state{color:var(--bad)}button{width:100%;min-height:50px;margin-top:10px;border:0;border-radius:14px;background:linear-gradient(135deg,#e7c15c,#b98b2b);color:#171005;font:800 15px Tahoma,Arial;cursor:pointer}button.secondary{background:#17263a;color:#e9eef5;border:1px solid #38516c}.summary{text-align:center;min-height:25px;font-weight:800}.summary.pass{color:var(--ok)}.summary.fail{color:var(--bad)}.note{margin:16px 0 0;padding:10px 12px;border-right:3px solid var(--gold);background:#161d27;font-size:13px}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand"><b>QiblaAstro</b><span>CODE 3 · ONLINE ADHAN EXPERIMENT</span></div>
+  <section class="card">
+    <p class="intro">اختبار مستقل لسياسة التجربة: صوت الأذان من خادم QiblaAstro عندما تكون الصفحة ظاهرة، وعدم تشغيله عندما تكون مخفية، وتحويل جدول Android إلى إشعار فقط.</p>
+    <div class="steps">
+      <div class="step" id="s1"><span class="n">1</span><span><b>مصدر الصوت عبر HTTPS</b><small>app.qiblalabs.com</small></span><span class="state">جارٍ</span></div>
+      <div class="step" id="s2"><span class="n">2</span><span><b>منع الصوت في الصفحة المخفية</b><small>لا تشغيل تلقائي عند الإغلاق</small></span><span class="state">جارٍ</span></div>
+      <div class="step" id="s3"><span class="n">3</span><span><b>وضع Android الآمن</b><small>Adhan → Notification، وOff يبقى Off</small></span><span class="state">جارٍ</span></div>
+      <div class="step" id="s4"><span class="n">4</span><span><b>وصول ملف الصوت</b><small>فحص تحميل بيانات ملف الأذان من الإنترنت</small></span><span class="state">جارٍ</span></div>
+    </div>
+    <button id="play" type="button" disabled>▶ تشغيل تجربة صوت الإنترنت</button>
+    <button id="stop" class="secondary" type="button" disabled>■ إيقاف الصوت</button>
+    <p id="summary" class="summary" role="status" aria-live="polite"></p>
+    <p class="note">هذا الرابط يختبر الصوت وسياسة التحويل فقط. إشعار التطبيق المغلق لا يمكن إصداره من المتصفح المنفصل؛ يحتاج فتح التجربة داخل تطبيق Google Play ومنح إذن الإشعارات.</p>
+  </section>
+</main>
+<script src="js/presentation/prayer/online-adhan-policy.js?v=20260821-code3-online-adhan1"></script>
+<script>
+'use strict';
+var audio=null,onlineURL='';
+function result(id,ok){var e=document.getElementById(id);e.classList.add(ok?'pass':'fail');e.querySelector('.state').textContent=ok?'نجح':'فشل';return ok;}
+function probe(url){return new Promise(function(resolve){var a=new Audio(),done=false,timer=setTimeout(function(){finish(false);},12000);function finish(ok){if(done)return;done=true;clearTimeout(timer);a.removeAttribute('src');resolve(ok);}a.preload='metadata';a.addEventListener('loadedmetadata',function(){finish(true);},{once:true});a.addEventListener('error',function(){finish(false);},{once:true});a.src=url;a.load();});}
+async function run(){var p=window.QiblaOnlineAdhanPolicy,summary=document.getElementById('summary');var https=!!p&&p.profile('makkah').normal.indexOf('https://app.qiblalabs.com/audio/adhan/')===0;onlineURL=https?p.profile('makkah').normal:'';var visibility=!!p&&p.canPlay({hidden:false,visibilityState:'visible'})===true&&p.canPlay({hidden:true,visibilityState:'hidden'})===false;var native=!!p&&p.nativeMode('adhan')==='notification'&&p.nativeMode('notification')==='notification'&&p.nativeMode('off')==='off';var reachable=https&&await probe(onlineURL);[result('s1',https),result('s2',visibility),result('s3',native),result('s4',reachable)];var ok=https&&visibility&&native&&reachable;summary.className='summary '+(ok?'pass':'fail');summary.textContent=ok?'نجحت سياسة التجربة وأصبح اختبار الصوت جاهزًا':'فشل جزء من الاختبار؛ لا تعتمد التجربة';document.getElementById('play').disabled=!reachable;document.getElementById('stop').disabled=!reachable;}
+document.getElementById('play').onclick=function(){if(!onlineURL)return;try{if(audio)audio.pause();audio=new Audio(onlineURL);audio.volume=1;audio.play().then(function(){document.getElementById('summary').textContent='يعمل الآن صوت الأذان عبر الإنترنت';}).catch(function(){document.getElementById('summary').textContent='تعذر تشغيل الصوت على هذا المتصفح';});}catch(_){}};
+document.getElementById('stop').onclick=function(){if(audio){audio.pause();audio.currentTime=0;}document.getElementById('summary').textContent='تم إيقاف الصوت';};
+run();
+</script>
+</body>
+</html>
