@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#05080f">
+  <title>اختبار إشعار QiblaAstro المستقل</title>
+  <style>
+    :root{color-scheme:dark;--bg:#05080f;--card:#0c1726;--line:#29425d;--gold:#e3b94d;--text:#f6f1e7;--muted:#a9b8c9;--ok:#57d68d;--bad:#ff7676}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,#10213a 0,var(--bg) 48%);font-family:"Noto Sans Arabic",system-ui,sans-serif;color:var(--text)}
+    main{width:min(680px,100%);margin:auto;padding:28px 16px 50px}.card{background:linear-gradient(180deg,rgba(14,29,48,.97),rgba(7,17,29,.98));border:1px solid var(--line);border-radius:28px;padding:24px;box-shadow:0 20px 60px #0008}
+    h1{margin:0;color:var(--gold);font-size:clamp(1.55rem,7vw,2.25rem);text-align:center}h2{font-size:1.05rem;margin:26px 0 12px}p{color:var(--muted);line-height:1.9}.meta{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:14px 0 22px}.pill{border:1px solid #39516c;border-radius:999px;padding:6px 10px;color:#c6d5e5;font-size:.78rem}
+    .checks{display:grid;gap:9px}.check{display:flex;align-items:center;justify-content:space-between;gap:15px;background:#111f30;border:1px solid #263c54;border-radius:15px;padding:12px 14px}.state{font-size:.8rem;color:var(--muted)}.state.ok{color:var(--ok)}.state.bad{color:var(--bad)}
+    .actions{display:grid;gap:11px}button{border:0;border-radius:15px;padding:14px 16px;font:700 1rem inherit;cursor:pointer;background:var(--gold);color:#181208}button.secondary{background:#17283a;color:var(--text);border:1px solid #35506e}button:disabled{opacity:.45;cursor:not-allowed}
+    #summary{min-height:58px;border:1px solid #31475f;background:#0a1422;border-radius:15px;padding:14px;margin-top:14px;color:#dbe8f5;line-height:1.8}.log{margin:12px 0 0;padding:0 20px;color:var(--muted);font-size:.84rem;line-height:1.8}.warning{border-right:4px solid var(--gold);padding:2px 13px;margin-top:22px;font-size:.88rem}.tiny{text-align:center;font-size:.76rem;margin-top:22px}
+  </style>
+</head>
+<body>
+<main>
+  <section class="card" aria-labelledby="title">
+    <h1 id="title">اختبار الإشعار المستقل</h1>
+    <div class="meta"><span class="pill">Code 3 · 3.1.0</span><span class="pill">فرع تجريبي فقط</span><span class="pill">لا يوجد AAB</span></div>
+    <p>هذا الاختبار معزول عن التطبيق. يمكنه إرسال إشعار فوري، أو جدولة إشعار تجريبي بعد 20 ثانية لتصغير المتصفح أو إغلاق الصفحة قبل ظهوره.</p>
+
+    <h2>جاهزية المتصفح</h2>
+    <div class="checks">
+      <div class="check"><span>اتصال HTTPS آمن</span><span class="state" id="secure-state">جارٍ الفحص</span></div>
+      <div class="check"><span>دعم Service Worker</span><span class="state" id="worker-state">جارٍ الفحص</span></div>
+      <div class="check"><span>دعم الإشعارات</span><span class="state" id="api-state">جارٍ الفحص</span></div>
+      <div class="check"><span>إذن الإشعار</span><span class="state" id="permission-state">غير محدد</span></div>
+    </div>
+
+    <h2>تنفيذ الاختبار</h2>
+    <div class="actions">
+      <button id="permission-button" type="button">1. طلب إذن الإشعار</button>
+      <button id="instant-button" class="secondary" type="button" disabled>2. إرسال إشعار فوري</button>
+      <button id="background-button" class="secondary" type="button" disabled>3. إشعار بعد 20 ثانية — صغّر المتصفح</button>
+      <button id="status-button" class="secondary" type="button">فحص آخر نتيجة محفوظة</button>
+    </div>
+    <div id="summary" role="status" aria-live="polite">جارٍ تجهيز بيئة الاختبار…</div>
+    <ul class="log" id="event-log"></ul>
+
+    <p class="warning"><strong>حد الاختبار:</strong> نجاح هذا الرابط يثبت إشعار الويب من عامل الخدمة لفترة قصيرة فقط. إشعار مواقيت الصلاة بعد إغلاق تطبيق QiblaAstro يعتمد على Android TWA ورمز الحماية الخاص بالتطبيق، ولا يمكن إثباته من نطاق المعاينة الخارجي.</p>
+    <p class="tiny">لم تُعدّل حسابات الصلاة أو الموقع أو القبلة أو الشاشة الرئيسية.</p>
+  </section>
+</main>
+<script src="./app.js?v=20260821-notification-test1"></script>
+</body>
+</html>
