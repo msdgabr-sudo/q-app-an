@@ -293,9 +293,10 @@
   if(!('serviceWorker' in navigator))return;
 
   function registerWorker(){
-    navigator.serviceWorker.register('./service-worker.js',{scope:'./'})
+    navigator.serviceWorker.getRegistration('./')
       .then(function(registration){
-        console.log('[SW] Registered:',registration.scope);
+        if(!registration)return;
+        console.log('[SW] Ready:',registration.scope);
         try{registration.update();}catch(_){ }
 
         navigator.serviceWorker.addEventListener('message',function(event){
